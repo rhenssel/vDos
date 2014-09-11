@@ -5,20 +5,9 @@
 #include "cpu.h"
 #include "callback.h"
 #include "inout.h"
-#include "pic.h"
-#include "mouse.h"
-#include "setup.h"
 #include "serialport.h"
 #include "parport.h"
-#include <time.h>
-#include <sys/timeb.h>
 
-
-/* if mem_systems 0 then size_extended is reported as the real size else 
- * zero is reported. ems and xms can increase or decrease the other_memsystems
- * counter using the BIOS_ZeroExtendedSize call */
-static Bit16u size_extended;
-static Bits other_memsystems = 0;
 void CMOS_SetRegister(Bitu regNr, Bit8u val); //For setting equipment word
 
 static Bitu INT70_Handler(void)
@@ -53,48 +42,47 @@ static Bitu INT1A_Handler(void)
 	CALLBACK_SIF(true);
 	switch (reg_ah)
 		{
-	case 0x00:	// Get System time
+	case 0x00:															// Get System time
 		{
 		Bit32u ticks = vPC_rLodsd(BIOS_TIMER);
 		reg_al = vPC_rLodsb(BIOS_24_HOURS_FLAG);
-		vPC_rStosb(BIOS_24_HOURS_FLAG, 0);	// reset the "flag"
+		vPC_rStosb(BIOS_24_HOURS_FLAG, 0);								// reset the midnight flag
 		reg_cx = (Bit16u)(ticks >> 16);
 		reg_dx = (Bit16u)(ticks & 0xffff);
 		break;
 		}
-	case 0x01:	// Set System time
+	case 0x01:															// Set System time
 		vPC_rStosd(BIOS_TIMER, (reg_cx<<16)|reg_dx);
 		break;
-	case 0x02:	// GET REAL-TIME CLOCK TIME (AT, XT286, PS)
-		IO_Write(0x70, 0x04);		// Hours
+	case 0x02:															// GET REAL-TIME CLOCK TIME (AT, XT286, PS)
+		IO_Write(0x70, 0x04);											// Hours
 		reg_ch = IO_Read(0x71);
-		IO_Write(0x70, 0x02);		// Minutes
+		IO_Write(0x70, 0x02);											// Minutes
 		reg_cl = IO_Read(0x71);
-		IO_Write(0x70, 0x00);		// Seconds
+		IO_Write(0x70, 0x00);											// Seconds
 		reg_dh = IO_Read(0x71);
-		reg_dl = 0;					// Daylight saving disabled
+		reg_dl = 0;														// Daylight saving disabled
 		CALLBACK_SCF(false);
 		break;
-	case 0x04:	// GET REAL-TIME ClOCK DATE  (AT, XT286, PS)
-		IO_Write(0x70, 0x32);		// Centuries
+	case 0x04:															// GET REAL-TIME ClOCK DATE  (AT, XT286, PS)
+		IO_Write(0x70, 0x32);											// Centuries
 		reg_ch = IO_Read(0x71);
-		IO_Write(0x70, 0x09);		// Years
+		IO_Write(0x70, 0x09);											// Years
 		reg_cl = IO_Read(0x71);
-		IO_Write(0x70, 0x08);		// Months
+		IO_Write(0x70, 0x08);											// Months
 		reg_dh = IO_Read(0x71);
-		IO_Write(0x70, 0x07);		// Days
+		IO_Write(0x70, 0x07);											// Days
 		reg_dl = IO_Read(0x71);
 		CALLBACK_SCF(false);
 		break;
-	case 0x80:	// Pcjr Setup Sound Multiplexer
-	case 0x81:	// Tandy sound system check
-	case 0x82:	// Tandy sound system start recording
-	case 0x83:	// Tandy sound system start playback
-	case 0x84:	// Tandy sound system stop playing
-	case 0x85:	// Tandy sound system reset
+	case 0x80:															// Pcjr Setup Sound Multiplexer
+	case 0x81:															// Tandy sound system check
+	case 0x82:															// Tandy sound system start recording
+	case 0x83:															// Tandy sound system start playback
+	case 0x84:															// Tandy sound system stop playing
+	case 0x85:															// Tandy sound system reset
 		break;
-	case 0xb1:	// PCI Bios Calls
-		LOG(LOG_BIOS,LOG_ERROR)("INT1A:PCI bios call %2X",reg_al);
+	case 0xb1:															// PCI Bios Calls
 		CALLBACK_SCF(true);
 		break;
 	default:
@@ -111,7 +99,7 @@ static Bitu INT11_Handler(void)
 
 static void BIOS_HostTimeSync()
 	{
-	_SYSTEMTIME systime;				// Windows localdate/time
+	_SYSTEMTIME systime;												// Windows localdate/time
 	GetLocalTime(&systime);
 	dos.date.day = (Bit8u)systime.wDay;
 	dos.date.month = (Bit8u)systime.wMonth;
@@ -130,26 +118,7 @@ static Bitu INT8_Handler(void)
 	BIOS_HostTimeSync();
 	return CBRET_NONE;
 	}
-/* incresing tick_counter doesn't update dos.dat.day/month/year, so disabled this version for now
-static Bitu INT8_Handler(void)
-	{
-	if (dos.hostdate)
-		BIOS_HostTimeSync();
-	else
-		{
-		// Increase the bios tick counter
-		Bit32u value = vPC_rLodsd(BIOS_TIMER) + 1;
-		if (value >= 0x1800B0)
-			{
-			// time wrap at midnight
-			vPC_rStosb(BIOS_24_HOURS_FLAG, mem_readb(BIOS_24_HOURS_FLAG)+1);
-			value = 0;
-			}
-		vPC_rStosd(BIOS_TIMER, value);
-		}
-	return CBRET_NONE;
-	}
-*/
+
 static Bitu INT1C_Handler(void)
 	{
 	return CBRET_NONE;
@@ -163,15 +132,15 @@ static Bitu INT12_Handler(void)
 
 static Bitu INT17_Handler(void)
 	{
-	if (reg_ah > 2 || reg_dx > 2)					// 0-2 printer port functions, no more than 3 parallel ports
+	if (reg_ah > 2 || reg_dx > 2)										// 0-2 printer port functions, no more than 3 parallel ports
 		return CBRET_NONE;
 
 	switch(reg_ah)
 		{
-	case 0:											// PRINTER: Write Character
+	case 0:																// PRINTER: Write Character
 		parallelPorts[reg_dx]->Putchar(reg_al);
 		break;
-	case 1:											// PRINTER: Initialize port
+	case 1:																// PRINTER: Initialize port
 		parallelPorts[reg_dx]->initialize();
 		break;
 		};
@@ -181,24 +150,24 @@ static Bitu INT17_Handler(void)
 
 static Bitu INT14_Handler(void)
 	{
-	if (reg_ah > 3 || reg_dx > 3)					// 0-3 serial port functions, no more than 4 serial ports
+	if (reg_ah > 3 || reg_dx > 3)										// 0-3 serial port functions, no more than 4 serial ports
 		return CBRET_NONE;
 	
 	switch (reg_ah)
 		{
-	case 0:		// Initialize port
-	case 3:		// get status
+	case 0:																// Initialize port
+	case 3:																// Get status
 		{
-		reg_ah = 0;									// line status
-		reg_al = 0x10;								// modem status, Clear to send
+		reg_ah = 0;														// Line status
+		reg_al = 0x10;													// Modem status, Clear to send
 		break;
 		}
-	case 1:		// Transmit character
+	case 1:																// Transmit character
 		serialPorts[reg_dx]->Putchar(reg_al);
-		reg_ah = 0;									// line status
+		reg_ah = 0;														// Line status
 		break;
-	case 2:		// Read character
-		reg_ah = 0x80;								// nothing received
+	case 2:																// Read character
+		reg_ah = 0x80;													// Nothing received
 		break;
 		}
 	return CBRET_NONE;
@@ -209,125 +178,70 @@ static Bitu INT15_Handler(void)
 	static Bit16u biosConfigSeg = 0;
 	switch (reg_ah)
 		{
-	case 0xC0:	// Get Configuration
+	case 0xC0:															// Get Configuration
 		{
 		if (biosConfigSeg == 0)
-			biosConfigSeg = DOS_GetMemory(1);		// We have 16 bytes
+			biosConfigSeg = DOS_GetMemory(1);							// We have 16 bytes
 		PhysPt data	= SegOff2Ptr(biosConfigSeg, 0);
-		vPC_rStosw(data, 8);						// 8 Bytes following
-		vPC_rStosb(data+2, 0xFC);					// Model ID (PC)
-		vPC_rStosb(data+3, 0x02);					// Submodel ID
-		vPC_rStosb(data+4, 0x00);					// Bios Revision
-		vPC_rStosb(data+5, 0x70);					// Feature Byte 1
-		vPC_rStosw(data+6, 0);						// Feature Byte 2 + 3
-		vPC_rStosw(data+8, 0);						// Feature Byte 4 + 5
+		vPC_rStosw(data, 8);											// 8 Bytes following
+		vPC_rStosb(data+2, 0xFC);										// Model ID (PC)
+		vPC_rStosb(data+3, 0x02);										// Submodel ID
+		vPC_rStosb(data+4, 0x00);										// Bios Revision
+		vPC_rStosb(data+5, 0x70);										// Feature Byte 1
+		vPC_rStosw(data+6, 0);											// Feature Byte 2 + 3
+		vPC_rStosw(data+8, 0);											// Feature Byte 4 + 5
 		CPU_SetSegGeneral(es, biosConfigSeg);
 		reg_bx = 0;
 		reg_ah = 0;
 		CALLBACK_SCF(false);
 		};
 		break;
-	case 0x4f:	// BIOS - Keyboard intercept
-		CALLBACK_SCF(true);							// Carry should be set but let's just set it just in case
+	case 0x4f:															// BIOS - Keyboard intercept
+		CALLBACK_SCF(true);												// Carry should be set but let's just set it just in case
 		break;
-	case 0x83:	// BIOS - SET EVENT WAIT INTERVAL
-		{
-		if (reg_al == 1)
-			{	// Cancel it
-			vPC_rStosb(BIOS_WAIT_FLAG_ACTIVE, 0);
-			IO_Write(0x70, 0xb);
-			IO_Write(0x71, IO_Read(0x71)&~0x40);
-			CALLBACK_SCF(false);
-			break;
-			}
-		if (vPC_rLodsb(BIOS_WAIT_FLAG_ACTIVE))
-			{
-			reg_ah = 0x80;
-			CALLBACK_SCF(true);
-			break;
-			}
-		Bit32u count = (reg_cx<<16)|reg_dx;
-		vPC_rStosd(BIOS_WAIT_FLAG_POINTER, SegOff2dWord(SegValue(es), reg_bx));
-		vPC_rStosd(BIOS_WAIT_FLAG_COUNT, count);
-		vPC_rStosb(BIOS_WAIT_FLAG_ACTIVE, 1);
-		// Reprogram RTC to start
-		IO_Write(0x70, 0xb);
-		IO_Write(0x71, IO_Read(0x71)|0x40);
-		CALLBACK_SCF(false);
-		}
+	case 0x83:															// BIOS - SET EVENT WAIT INTERVAL
+		reg_ah = 0x86;													// Not supported
+	case 0x86:															// BIOS - WAIT (AT, PS)
+		CALLBACK_SCF(true);
 		break;
-	case 0x84:	// BIOS - JOYSTICK SUPPORT (XT after 11/8/82, AT, XT286, PS)
-		if (reg_dx == 0)		// Get Joystick button status
-			reg_al = 0;
-		else if (reg_dx == 1)
-			reg_ax = reg_bx = reg_cx = reg_dx = 0;
-		CALLBACK_SCF(false);
-		break;
-	case 0x86:	// BIOS - WAIT (AT, PS)
+	case 0x87:															// Copy extended memory
 		{
-		if (vPC_rLodsb(BIOS_WAIT_FLAG_ACTIVE))
-			{
-			reg_ah = 0x83;
-			CALLBACK_SCF(true);
-			break;
-			}
-		Bit32u count = (reg_cx<<16)|reg_dx;
-		vPC_rStosd(BIOS_WAIT_FLAG_POINTER, BIOS_WAIT_FLAG_TEMP);
-		vPC_rStosd(BIOS_WAIT_FLAG_COUNT, count);
-		vPC_rStosb(BIOS_WAIT_FLAG_ACTIVE, 1);
-		// Reprogram RTC to start
-		IO_Write(0x70, 0xb);
-		IO_Write(0x71, IO_Read(0x71)|0x40);
-		while (vPC_rLodsd(BIOS_WAIT_FLAG_COUNT))
-			CALLBACK_Idle();
-		CALLBACK_SCF(false);
-		}
-	case 0x87:	// Copy extended memory
-		{
-		bool enabled = MEM_A20_Enabled();
-		MEM_A20_Enable(true);
 		Bitu   bytes	= reg_cx * 2;
 		PhysPt data		= SegPhys(es)+reg_si;
 		PhysPt source	= (vPC_rLodsd(data+0x12) & 0x00FFFFFF) + (vPC_rLodsb(data+0x16)<<24);
 		PhysPt dest		= (vPC_rLodsd(data+0x1A) & 0x00FFFFFF) + (vPC_rLodsb(data+0x1E)<<24);
 		vPC_rMovsb(dest, source, bytes);
 		reg_ax = 0;
-		MEM_A20_Enable(enabled);
 		CALLBACK_SCF(false);
 		break;
-		}	
-	case 0x88:	// SYSTEM - GET EXTENDED MEMORY SIZE (286+)
-		reg_ax = other_memsystems ? 0 : size_extended;
+		}
+	case 0x88:															// SYSTEM - GET EXTENDED MEMORY SIZE (286+)
+		reg_ax = 0;
 		CALLBACK_SCF(false);
 		break;
-	case 0x89:	// SYSTEM - SWITCH TO PROTECTED MODE
+	case 0x89:															// SYSTEM - SWITCH TO PROTECTED MODE
 		reg_ah = 0xff;
 		CALLBACK_SCF(true);
 		break;
-	case 0x90:	// OS HOOK - DEVICE BUSY
-	case 0x91:	// OS HOOK - DEVICE POST
+	case 0x90:															// OS HOOK - DEVICE BUSY
+	case 0x91:															// OS HOOK - DEVICE POST
 		CALLBACK_SCF(false);
 		reg_ah = 0;
 		break;
-	case 0xc2:	// BIOS PS2 Pointing Device Support
+	case 0xc2:															// BIOS PS2 Pointing Device Support
 		CALLBACK_SCF(true);
 		reg_ah = 1;
 		break;
-	case 0xc3:	// set carry flag so BorlandRTM doesn't assume a VECTRA/PS2
-		reg_ah = 0x86;
-		CALLBACK_SCF(true);
-		break;
-	case 0xc4:	// BIOS POS Programm option Select
+	case 0xc4:															// BIOS POS Programm option Select
 		CALLBACK_SCF(true);
 		break;
 	case 0x06:
 		break;
 	default:
-		LOG(LOG_BIOS, LOG_ERROR)("INT15:Unknown call %4X", reg_ax);
+		LOG_MSG("INT15: Unsupported/unknown call %4X", reg_ax);
 		reg_ah = 0x86;
 		CALLBACK_SCF(true);
-		// relict from comparisons, as int15 exits with a retf2 instead of an iret
-		CALLBACK_SZF(false);
+		CALLBACK_SZF(false);					
 		}
 	return CBRET_NONE;
 	}
@@ -337,173 +251,27 @@ static Bitu Reboot_Handler(void)
 	return CBRET_NONE;
 	}
 
-void BIOS_ZeroExtendedSize(bool in)
-	{
-	if (in)
-		other_memsystems++; 
-	else if (other_memsystems)
-		other_memsystems--;
-	}
-
 void BIOS_SetupKeyboard(void);
 void BIOS_SetupDisks(void);
-
-class BIOS:public Module_base
-	{
-private:
-	CALLBACK_HandlerObject callback[11];
-public:
-	BIOS(Section* configuration):Module_base(configuration)
-		{
-		// Clear the Bios Data Area (0x400-0x5ff, 0x600- is accounted to DOS)
-		for (Bit16u i = 0; i < 0x200; i++)
-			vPC_rStosb(0x40, i, 0);
-
-		// Setup all the interrupt handlers the bios controls
-
-		// INT 8 Clock IRQ Handler
-		Bitu call_irq0 = CALLBACK_Allocate();	
-		CALLBACK_Setup(call_irq0, INT8_Handler, CB_IRQ0, dWord2Ptr(BIOS_DEFAULT_IRQ0_LOCATION), "IRQ 0 Clock");
-		RealSetVec(0x08, BIOS_DEFAULT_IRQ0_LOCATION);
-		// pseudocode for CB_IRQ0:
-		//	callback INT8_Handler
-		//	push ax,dx,ds
-		//	int 0x1c
-		//	cli
-		//	pop ds,dx
-		//	mov al, 0x20
-		//	out 0x20, al
-		//	pop ax
-		//	iret
-
-		vPC_rStosd(BIOS_TIMER, 0);		// Calculate the correct time
-
-		// INT 11 Get equipment list
-		callback[1].Install(&INT11_Handler, CB_IRET, "Int 11 Equipment");
-		callback[1].Set_RealVec(0x11);
-
-		// INT 12 Memory Size default at 640 kb
-		callback[2].Install(&INT12_Handler, CB_IRET, "Int 12 Memory");
-		callback[2].Set_RealVec(0x12);
-		vPC_rStosw(BIOS_MEMORY_SIZE, 640);
-		
-		// INT 13 Bios Disk Support
-		BIOS_SetupDisks();
-
-		// INT 14 Serial Ports
-		callback[3].Install(&INT14_Handler, CB_IRET_STI, "Int 14 COM-port");
-		callback[3].Set_RealVec(0x14);
-
-		// INT 15 Misc Calls
-		callback[4].Install(&INT15_Handler, CB_IRET, "Int 15 Bios");
-		callback[4].Set_RealVec(0x15);
-
-		// INT 16 Keyboard handled in another file
-		BIOS_SetupKeyboard();
-
-		// INT 17 Printer Routines
-		callback[5].Install(&INT17_Handler, CB_IRET_STI, "Int 17 Printer");
-		callback[5].Set_RealVec(0x17);
-
-		// INT 1A TIME and some other functions
-		callback[6].Install(&INT1A_Handler, CB_IRET_STI, "Int 1a Time");
-		callback[6].Set_RealVec(0x1A);
-
-		// INT 1C System Timer tick called from INT 8
-		callback[7].Install(&INT1C_Handler, CB_IRET, "Int 1c Timer");
-		callback[7].Set_RealVec(0x1C);
-		
-		// IRQ 8 RTC Handler
-		callback[8].Install(&INT70_Handler, CB_IRET, "Int 70 RTC");
-		callback[8].Set_RealVec(0x70);
-
-		// Irq 9 rerouted to irq 2
-		callback[9].Install(NULL, CB_IRQ9, "irq 9 bios");
-		callback[9].Set_RealVec(0x71);
-
-		// Reboot
-		callback[10].Install(&Reboot_Handler, CB_IRET, "reboot");
-		callback[10].Set_RealVec(0x18);
-		RealPt rptr = callback[10].Get_RealPointer();
-		RealSetVec(0x19, rptr);
-		// set system BIOS entry point too
-		vPC_aStosb(0xFFFF0, 0xEA);				// FARJMP
-		vPC_aStosd(0xFFFF1, rptr);
-
-		// Irq 2
-		Bitu call_irq2 = CALLBACK_Allocate();	
-		CALLBACK_Setup(call_irq2, NULL, CB_IRET_EOI_PIC1, dWord2Ptr(BIOS_DEFAULT_IRQ2_LOCATION), "irq 2 bios");
-		RealSetVec(0x0a, BIOS_DEFAULT_IRQ2_LOCATION);
-
-		// Some hardcoded vectors
-		vPC_aStosb(dWord2Ptr(BIOS_DEFAULT_HANDLER_LOCATION), 0xcf);		// bios default interrupt vector location -> IRET
-		vPC_aStosw(dWord2Ptr(RealGetVec(0x12))+0x12, 0x20);				// Hack for Jurresic
-
-		vPC_aStosb(0xffffe, 0xfc);
-
-		// System BIOS identification
-		phys_writes(0xfe00e, "IBM COMPATIBLE 486 BIOS COPYRIGHT The DOSBox Team.",  50);
-		
-		// System BIOS version
-		phys_writes(0xfe061, "vDOS FakeBIOS v1.0",  18);
-
-		// write system BIOS date
-		phys_writes(0xffff5, "01/01/92",  8);
-		vPC_aStosb(0xfffff, 0x55);	// signature
-
-		// program system timer
-		// timer 2
-		IO_Write(0x43, 0xb6);
-		IO_Write(0x42, 1320&0xff);
-		IO_Write(0x42, 1320>>8);
-
-		// Setup some stuff in 0x40 bios segment
-		
-		// port timeouts
-//		for(Bitu i = 0; i < 3; i++)
-//			BIOS_SetLPTPort(i, 0);
-		for (Bitu i = BIOS_COM1_TIMEOUT; i <= BIOS_COM4_TIMEOUT; i++)
-			vPC_rStosb(i, 1);
-
-		// Setup equipment list
-		// look http://www.bioscentral.com/misc/bda.htm
-		
-		Bit16u config = 0x24;	// Startup 80x25 color, PS2 mouse
-		vPC_rStosw(BIOS_CONFIGURATION, config);
-		CMOS_SetRegister(0x14, (Bit8u)(config&0xff));	//Should be updated on changes
-		// Setup extended memory size
-		IO_Write(0x70, 0x30);
-		size_extended = IO_Read(0x71);
-		IO_Write(0x70, 0x31);
-		size_extended |= (IO_Read(0x71) << 8);
-
-		BIOS_HostTimeSync();
-		}
-	~BIOS()
-		{
-		// abort DAC playing
-		vPC_rStosb(0x40, 0xd4, 0x00);
-		}
-	};
 
 // set com port data in bios data area
 // parameter: array of 4 com port base addresses, all 4 are set!
 void BIOS_SetComPorts(Bit16u baseaddr[])
 	{
 	for (Bitu i = 0; i < 4; i++)
-		vPC_rStosw(BIOS_BASE_ADDRESS_COM1 + i*2, baseaddr[i]);
+		vPC_aStosw(BIOS_BASE_ADDRESS_COM1 + i*2, baseaddr[i]);
 	// set equipment word
 	Bit16u equipmentword = vPC_rLodsw(BIOS_CONFIGURATION);
 	equipmentword &= (~0x0E00);
 	equipmentword |= (4 << 9);
-	vPC_rStosw(BIOS_CONFIGURATION, equipmentword);
+	vPC_aStosw(BIOS_CONFIGURATION, equipmentword);
 	CMOS_SetRegister(0x14, (Bit8u)(equipmentword&0xff));	//Should be updated on changes
 	}
 
 void BIOS_SetLPTPort(Bitu port, Bit16u baseaddr)			// port is always < 3
 	{
-	vPC_rStosw(BIOS_ADDRESS_LPT1 + port*2, baseaddr);
-	vPC_rStosb(BIOS_LPT1_TIMEOUT + port, 10);
+	vPC_aStosw(BIOS_ADDRESS_LPT1 + port*2, baseaddr);
+	vPC_aStosb(BIOS_LPT1_TIMEOUT + port, 10);
 	// set equipment word: count ports
 	Bit16u portcount = 0;
 	for (Bitu i = 0; i < 3; i++)
@@ -515,15 +283,123 @@ void BIOS_SetLPTPort(Bitu port, Bit16u baseaddr)			// port is always < 3
 	vPC_rStosw(BIOS_CONFIGURATION, equipmentword);
 	}
 
-static BIOS* test;
+static 	CALLBACK_HandlerObject callback[11];
 
-void BIOS_Destroy(Section* /*sec*/)
+void BIOS_Init()
 	{
-	delete test;
-	}
+	// Clear the Bios Data Area (0x400-0x5ff, 0x600- is accounted to DOS)
+	vPC_rStoswb(0x400, 0, 0x200);
 
-void BIOS_Init(Section* sec)
-	{
-	test = new BIOS(sec);
-	sec->AddDestroyFunction(&BIOS_Destroy);
+	// Setup all the interrupt handlers the bios controls
+
+	// INT 8 Clock IRQ Handler
+	Bitu call_irq0 = CALLBACK_Allocate();	
+	CALLBACK_Setup(call_irq0, INT8_Handler, CB_IRQ0, dWord2Ptr(BIOS_DEFAULT_IRQ0_LOCATION), "IRQ 0 Clock");
+	RealSetVec(0x08, BIOS_DEFAULT_IRQ0_LOCATION);
+	// pseudocode for CB_IRQ0:
+	//	callback INT8_Handler
+	//	push ax,dx,ds
+	//	int 0x1c
+	//	cli
+	//	pop ds,dx
+	//	mov al, 0x20
+	//	out 0x20, al
+	//	pop ax
+	//	iret
+
+	vPC_rStosd(BIOS_TIMER, 0);		// Calculate the correct time
+
+	// INT 11 Get equipment list
+	callback[1].Install(&INT11_Handler, CB_IRET, "Int 11 Equipment");
+	callback[1].Set_RealVec(0x11);
+
+	// INT 12 Memory Size default at 640 kb
+	callback[2].Install(&INT12_Handler, CB_IRET, "Int 12 Memory");
+	callback[2].Set_RealVec(0x12);
+	vPC_rStosw(BIOS_MEMORY_SIZE, 640);
+		
+	// INT 13 Bios Disk Support
+	BIOS_SetupDisks();
+
+	// INT 14 Serial Ports
+	callback[3].Install(&INT14_Handler, CB_IRET_STI, "Int 14 COM-port");
+	callback[3].Set_RealVec(0x14);
+
+	// INT 15 Misc Calls
+	callback[4].Install(&INT15_Handler, CB_IRET, "Int 15 Bios");
+	callback[4].Set_RealVec(0x15);
+
+	// INT 16 Keyboard handled in another file
+	BIOS_SetupKeyboard();
+
+	// INT 17 Printer Routines
+	callback[5].Install(&INT17_Handler, CB_IRET_STI, "Int 17 Printer");
+	callback[5].Set_RealVec(0x17);
+
+	// INT 1A TIME and some other functions
+	callback[6].Install(&INT1A_Handler, CB_IRET_STI, "Int 1a Time");
+	callback[6].Set_RealVec(0x1A);
+
+	// INT 1C System Timer tick called from INT 8
+	callback[7].Install(&INT1C_Handler, CB_IRET, "Int 1c Timer");
+	callback[7].Set_RealVec(0x1C);
+		
+	// IRQ 8 RTC Handler
+	callback[8].Install(&INT70_Handler, CB_IRET, "Int 70 RTC");
+	callback[8].Set_RealVec(0x70);
+
+	// Irq 9 rerouted to irq 2
+	callback[9].Install(NULL, CB_IRQ9, "irq 9 bios");
+	callback[9].Set_RealVec(0x71);
+
+	// Reboot
+	callback[10].Install(&Reboot_Handler, CB_IRET, "reboot");
+	callback[10].Set_RealVec(0x18);
+	RealPt rptr = callback[10].Get_RealPointer();
+	RealSetVec(0x19, rptr);
+	// set system BIOS entry point too
+	vPC_aStosb(0xFFFF0, 0xEA);				// FARJMP
+	vPC_aStosd(0xFFFF1, rptr);
+
+	// Irq 2
+	Bitu call_irq2 = CALLBACK_Allocate();	
+	CALLBACK_Setup(call_irq2, NULL, CB_IRET_EOI_PIC1, dWord2Ptr(BIOS_DEFAULT_IRQ2_LOCATION), "irq 2 bios");
+	RealSetVec(0x0a, BIOS_DEFAULT_IRQ2_LOCATION);
+
+	// Some hardcoded vectors
+	vPC_aStosb(dWord2Ptr(BIOS_DEFAULT_HANDLER_LOCATION), 0xcf);		// bios default interrupt vector location -> IRET
+	vPC_aStosw(dWord2Ptr(RealGetVec(0x12))+0x12, 0x20);				// Hack for Jurresic
+
+	vPC_aStosb(0xffffe, 0xfc);
+
+	// System BIOS identification
+	phys_writes(0xfe00e, "IBM COMPATIBLE 486 BIOS COPYRIGHT The DOSBox Team.",  50);
+		
+	// System BIOS version
+	phys_writes(0xfe061, "vDOS FakeBIOS v1.0",  18);
+
+	// write system BIOS date
+	phys_writes(0xffff5, "01/01/92",  8);
+	vPC_aStosb(0xfffff, 0x55);	// signature
+
+	// program system timer
+	// timer 2
+	IO_Write(0x43, 0xb6);
+	IO_Write(0x42, 1320&0xff);
+	IO_Write(0x42, 1320>>8);
+
+	// Setup some stuff in 0x40 bios segment
+		
+	// port timeouts
+	for (Bitu i = BIOS_COM1_TIMEOUT; i <= BIOS_COM4_TIMEOUT; i++)
+		vPC_rStosb(i, 1);
+
+	// Setup equipment list
+	// look http://www.bioscentral.com/misc/bda.htm
+		
+	Bit16u config = 0x24;	// Startup 80x25 color, PS2 mouse
+	vPC_rStosw(BIOS_CONFIGURATION, config);
+	CMOS_SetRegister(0x14, (Bit8u)(config&0xff));	//Should be updated on changes
+
+	BIOS_HostTimeSync();
 	}

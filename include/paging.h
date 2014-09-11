@@ -9,7 +9,6 @@
 #endif
 
 #define MEM_PAGE_SIZE	(4096)
-#define XMS_START		(0x110)
 
 #define PFLAG_READABLE		0x1
 #define PFLAG_WRITEABLE		0x2
@@ -22,19 +21,19 @@ class PageHandler
 	{
 public:
 	virtual ~PageHandler(void) { }
-	virtual Bitu readb(PhysPt addr);
-	virtual Bitu readw(PhysPt addr);
-	virtual Bitu readd(PhysPt addr);
-	virtual void writeb(PhysPt addr, Bitu val);
-	virtual void writew(PhysPt addr, Bitu val);
-	virtual void writed(PhysPt addr, Bitu val);
-	virtual HostPt GetHostReadPt(Bitu phys_page);
-	virtual HostPt GetHostWritePt(Bitu phys_page);
-	Bitu flags;
+	virtual Bit8u readb(PhysPt addr);
+	virtual Bit16u readw(PhysPt addr);
+	virtual Bit32u readd(PhysPt addr);
+	virtual void writeb(PhysPt addr, Bit8u val);
+	virtual void writew(PhysPt addr, Bit16u val);
+	virtual void writed(PhysPt addr, Bit32u val);
+	virtual HostPt GetHostPt(PhysPt addr);
+	Bit8u flags;
 	};
 
 // Some other functions
 void PAGING_Enable(bool enabled);
+bool PAGING_Enabled(void);
 
 Bitu PAGING_GetDirBase(void);
 void PAGING_SetDirBase(Bitu cr3);
@@ -45,10 +44,9 @@ void MEM_ResetPageHandler(Bitu phys_page, Bitu pages);
 struct PagingBlock {
 	Bitu	cr3;
 	Bitu	cr2;
+	bool	enabled;
 };
 
 extern PagingBlock paging; 
 
-// Some support functions
-PageHandler * MEM_GetPageHandler(Bitu phys_page);
 #endif

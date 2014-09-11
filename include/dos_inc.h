@@ -1,12 +1,8 @@
 #ifndef vDOS_DOS_INC_H
 #define vDOS_DOS_INC_H
 
-#ifndef vDOS_DOS_SYSTEM_H
 #include "dos_system.h"
-#endif
-#ifndef VDOS_MEM_H
 #include "mem.h"
-#endif
 
 #ifdef _MSC_VER
 #pragma pack (1)
@@ -32,8 +28,6 @@ struct DOS_Version {
 enum {MCB_FREE = 0x0000, MCB_DOS = 0x0008};
 enum {RETURN_EXIT = 0, RETURN_CTRLC = 1, RETURN_ABORT = 2, RETURN_TSR = 3};
 
-extern Bitu DOS_FILES;
-
 #define DOS_DRIVES 26
 #define DOS_DEVICES 25
 
@@ -49,8 +43,10 @@ extern Bitu DOS_FILES;
 #define DOS_FIRST_SHELL 0x118
 #define DOS_MEM_START 0x16f				// First Segment that DOS can use
 
-#define DOS_PRIVATE_SEGMENT 0xc800
-#define DOS_PRIVATE_SEGMENT_END 0xd000
+//#define DOS_PRIVATE_SEGMENT 0xc800
+//#define DOS_PRIVATE_SEGMENT_END 0xd000
+#define DOS_PRIVATE_SEGMENT 0xc400
+#define DOS_PRIVATE_SEGMENT_END 0xc800
 
 // internal Dos Tables
 extern DOS_File ** Files;
@@ -125,7 +121,7 @@ void DOS_FreeProcessMemory(Bit16u pspseg);
 Bit16u DOS_GetMemory(Bit16u pages);
 bool DOS_SetMemAllocStrategy(Bit16u strat);
 Bit16u DOS_GetMemAllocStrategy(void);
-void DOS_BuildUMBChain(bool umb_active);
+void DOS_BuildUMBChain(bool ems_active);
 bool DOS_LinkUMBsToMemChain(Bit16u linkstate);
 
 // FCB stuff
@@ -155,18 +151,15 @@ static Bit16u long2para(Bit32u size)
 	{
 	if (size > 0xFFFF0)
 		return 0xffff;
-	if (size&0xf)
-		return (Bit16u)((size>>4)+1);
-	else
-		return (Bit16u)(size>>4);
+	return (Bit16u)((size+15)/16);
 	}
 
-static INLINE Bit16u DOS_PackTime(Bit16u hour, Bit16u min, Bit16u sec)
+static Bit16u DOS_PackTime(Bit16u hour, Bit16u min, Bit16u sec)
 	{
 	return (hour&0x1f)<<11 | (min&0x3f) << 5 | ((sec/2)&0x1f);
 	}
 
-static INLINE Bit16u DOS_PackDate(Bit16u year, Bit16u mon, Bit16u day)
+static Bit16u DOS_PackDate(Bit16u year, Bit16u mon, Bit16u day)
 	{
 	return ((year-1980)&0x7f)<<9 | (mon&0x3f) << 5 | (day&0x1f);
 	}
@@ -273,7 +266,7 @@ public:
 	void	SetFCB1				(RealPt src);
 	void	SetFCB2				(RealPt src);
 	void	SetCommandTail		(RealPt src);	
-	bool	SetNumFiles			(Bit16u fileNum);
+	void	SetNumFiles			(Bit16u fileNum);
 	Bit16u	FindEntryByHandle	(Bit8u handle);
 			
 private:

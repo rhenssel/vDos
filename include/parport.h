@@ -43,7 +43,6 @@ private:
 	};
 
 extern CParallel* parallelPorts[];
-void PARALLEL_Init (Section * sec);
 
 const Bit16u parallel_baseaddr[3] = {0x378, 0x278, 0x3bc};
 

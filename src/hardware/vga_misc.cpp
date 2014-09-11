@@ -5,36 +5,33 @@
 #include <math.h>
 
 
-void vga_write_p3d4(Bitu port,Bitu val,Bitu iolen);
-Bitu vga_read_p3d4(Bitu port,Bitu iolen);
-void vga_write_p3d5(Bitu port,Bitu val,Bitu iolen);
-Bitu vga_read_p3d5(Bitu port,Bitu iolen);
+void vga_write_p3d4(Bitu port, Bitu val,Bitu iolen);
+Bitu vga_read_p3d4(Bitu port, Bitu iolen);
+void vga_write_p3d5(Bitu port, Bitu val,Bitu iolen);
+Bitu vga_read_p3d5(Bitu port, Bitu iolen);
 
-Bitu vga_read_p3da(Bitu port,Bitu iolen)
+Bitu vga_read_p3da(Bitu port, Bitu iolen)											// bit 0 = horizontal or vertical blanking, 3 = vertical sync
 	{
-	Bit8u retval = 0;
+	static Bitu hvBlank = 0;														// Just cycle through 0 and 1 (don't mind this hard level check)
+	hvBlank ^= 1;
+	Bit8u retval = hvBlank;
 	double timeInFrame = PIC_FullIndex()-vga.draw.delay.framestart;
 
 	vga.internal.attrindex = false;
 
-	// 3DAh (R):  Status Register
-	// bit   0  Horizontal or Vertical blanking
-	//       3  Vertical sync
-
 	if (timeInFrame >= vga.draw.delay.vrstart && timeInFrame <= vga.draw.delay.vrend)
 		retval |= 8;
+	return retval;
 	if (timeInFrame >= vga.draw.delay.vdend)
 		retval |= 1;
 	else
 		{
 		double timeInLine = fmod(timeInFrame, vga.draw.delay.htotal);
-		if (timeInLine >= vga.draw.delay.hblkstart &&  timeInLine <= vga.draw.delay.hblkend)
-			retval |= 1;
 		}
 	return retval;
 	}
 
-static void write_p3c2(Bitu port,Bitu val,Bitu iolen)
+static void write_p3c2(Bitu port, Bitu val,Bitu iolen)
 	{
 	vga.misc_output = val;
 	if (val & 0x1)

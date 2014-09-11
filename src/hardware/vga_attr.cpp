@@ -16,10 +16,7 @@ void VGA_ATTR_SetPalette(Bit8u index, Bit8u val)
 
 Bitu read_p3c0(Bitu /*port*/, Bitu /*iolen*/)
 	{
-	// Wcharts, Win 3.11 & 95 SVGA
 	Bitu retval = attr(index) & 0x1f;
-	if (!(attr(disabled) & 0x1))
-		retval |= 0x20;
 	return retval;
 	}
  
@@ -29,14 +26,8 @@ void write_p3c0(Bitu /*port*/,Bitu val, Bitu iolen)
 		{
 		attr(index) = val & 0x1F;
 		vga.internal.attrindex = true;
-		if (val & 0x20)
-			attr(disabled) &= ~1;
-		else
-			attr(disabled) |= 1;
 		/* 
 			0-4	Address of data register to write to port 3C0h or read from port 3C1h
-			5	If set screen output is enabled and the palette can not be modified,
-				if clear screen output is disabled and the palette can be modified.
 		*/
 		return;
 		}
@@ -44,8 +35,7 @@ void write_p3c0(Bitu /*port*/,Bitu val, Bitu iolen)
 	// Palette
 	if (attr(index) < 0x10)
 		{
-		if (attr(disabled) & 0x1)
-			VGA_ATTR_SetPalette(attr(index), (Bit8u)val);
+		VGA_ATTR_SetPalette(attr(index), (Bit8u)val);
 		/*
 			0-5	Index into the 256 color DAC table. May be modified by 3C0h index
 			10h and 14h.
@@ -55,7 +45,7 @@ void write_p3c0(Bitu /*port*/,Bitu val, Bitu iolen)
 	switch (attr(index))
 		{
 	case 0x10:
-		{		// Mode Control Register
+		{																			// Mode control register
 		Bitu difference = attr(mode_control)^val;
 		attr(mode_control) = (Bit8u)val;
 		if (difference & 0x80)
@@ -83,11 +73,9 @@ void write_p3c0(Bitu /*port*/,Bitu val, Bitu iolen)
 		*/
 		break;
 		}
-	case 0x11:		// Overscan Color Register
-		attr(overscan_color) = (Bit8u)val;
-		/* 0-5  Color of screen border. Color is defined as in the palette registers. */
+	case 0x11:																		// Overscan color register
 		break;
-	case 0x12:		// Color Plane Enable Register
+	case 0x12:																		// Color plane enable register
 		// Why disable colour planes?
 		attr(color_plane_enable) = (Bit8u)val;
 		/* 
@@ -100,7 +88,7 @@ void write_p3c0(Bitu /*port*/,Bitu val, Bitu iolen)
 				Register 1 (3dAh). 0: Bit 2/0, 1: Bit 5/4, 2: bit 3/1, 3: bit 7/6
 		*/
 		break;
-	case 0x13:		// Horizontal PEL Panning Register, we don't do this
+	case 0x13:																		// Horizontal PEL panning register, we don't do this
 		attr(horizontal_pel_panning) = val & 0xF;
 		/*
 			0-3	Indicates number of pixels to shift the display left
@@ -116,7 +104,7 @@ void write_p3c0(Bitu /*port*/,Bitu val, Bitu iolen)
 				8          0              n/a            n/a
 		*/
 		break;
-	case 0x14:		// Color Select Register
+	case 0x14:																		// Color select register
 		if (attr(color_select) ^ val)
 			{
 			attr(color_select) = (Bit8u)val;
@@ -137,20 +125,19 @@ void write_p3c0(Bitu /*port*/,Bitu val, Bitu iolen)
 Bitu read_p3c1(Bitu /*port*/, Bitu iolen)
 	{
 //	vga.internal.attrindex=false;
-	// Palette
-	if (attr(index) < 0x10)
+	if (attr(index) < 0x10)															// Palette
 		return attr(palette[attr(index)]);
 	switch (attr(index))
 		{
-	case 0x10:		// Mode Control Register
+	case 0x10:																		// Mode control register
 		return attr(mode_control);
-	case 0x11:		// Overscan Color Register
-		return attr(overscan_color);
-	case 0x12:		// Color Plane Enable Register
+//	case 0x11:																		// Overscan color register
+//		return 0;
+	case 0x12:																		// Color plane enable register
 		return attr(color_plane_enable);
-	case 0x13:		// Horizontal PEL Panning Register
+	case 0x13:																		// Horizontal PEL panning register
 		return attr(horizontal_pel_panning);
-	case 0x14:		// Color Select Register
+	case 0x14:																		// Color select register
 		return attr(color_select);
 	}
 	return 0;

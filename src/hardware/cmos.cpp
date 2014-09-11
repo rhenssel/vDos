@@ -1,12 +1,10 @@
 #include <time.h>
 #include <math.h>
-
 #include "vDos.h"
 #include "timer.h"
 #include "pic.h"
 #include "inout.h"
 #include "mem.h"
-#include "setup.h"
 
 static struct {
 	Bit8u regs[0x40];
@@ -227,47 +225,24 @@ void CMOS_SetRegister(Bitu regNr, Bit8u val)
 	}
 
 
-class CMOS:public Module_base
-	{
-private:
-	IO_ReadHandleObject ReadHandler[2];
-	IO_WriteHandleObject WriteHandler[2];	
-public:
-	CMOS(Section* configuration):Module_base(configuration)
-		{
-		WriteHandler[0].Install(0x70, cmos_selreg, IO_MB);
-		WriteHandler[1].Install(0x71, cmos_writereg, IO_MB);
-		ReadHandler[0].Install(0x71, cmos_readreg, IO_MB);
-		cmos.timer.enabled = false;
-		cmos.timer.acknowledged = true;
-		cmos.reg = 0xa;
-		cmos_writereg(0x71, 0x26, 1);
-		cmos.reg = 0xb;
-		cmos_writereg(0x71, 0x2, 1);	// Struct tm *loctime is of 24 hour format,
-		cmos.reg = 0xd;
-		cmos_writereg(0x71, 0x80, 1);	// RTC power on
-		// Equipment is updated from bios.cpp and bios_disk.cpp
-		// Fill in base memory size, it is 640K always
-		cmos.regs[0x15] = (Bit8u)0x80;
-		cmos.regs[0x16] = (Bit8u)0x02;
-		// Fill in extended memory size
-		Bitu exsize = (MEM_TotalPages()*4)-1024;
-		cmos.regs[0x17] = (Bit8u)exsize;
-		cmos.regs[0x18] = (Bit8u)(exsize >> 8);
-		cmos.regs[0x30] = (Bit8u)exsize;
-		cmos.regs[0x31] = (Bit8u)(exsize >> 8);
-		}
-	};
+static	IO_ReadHandleObject ReadHandler[2];
+static	IO_WriteHandleObject WriteHandler[2];	
 
-static CMOS* test;
-
-void CMOS_Destroy(Section* sec)
+void CMOS_Init()
 	{
-	delete test;
-	}
-
-void CMOS_Init(Section* sec)
-	{
-	test = new CMOS(sec);
-	sec->AddDestroyFunction(&CMOS_Destroy);
+	WriteHandler[0].Install(0x70, cmos_selreg, IO_MB);
+	WriteHandler[1].Install(0x71, cmos_writereg, IO_MB);
+	ReadHandler[0].Install(0x71, cmos_readreg, IO_MB);
+	cmos.timer.enabled = false;
+	cmos.timer.acknowledged = true;
+	cmos.reg = 0xa;
+	cmos_writereg(0x71, 0x26, 1);
+	cmos.reg = 0xb;
+	cmos_writereg(0x71, 0x2, 1);							// Struct tm *loctime is of 24 hour format,
+	cmos.reg = 0xd;
+	cmos_writereg(0x71, 0x80, 1);							// RTC power on
+	// Equipment is updated from bios.cpp and bios_disk.cpp
+	*(Bit32u*)(cmos.regs+0x15) = 640;						// Base memory size, it is always 640K
+	*(Bit32u*)(cmos.regs+0x17) = TOT_MEM_BYTES/1024-1024;	// Extended memory size
+	*(Bit32u*)(cmos.regs+0x30) = TOT_MEM_BYTES/1024-1024;
 	}

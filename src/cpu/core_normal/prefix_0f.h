@@ -127,9 +127,9 @@
 		if (cpu.pmode && cpu.cpl) EXCEPTION(EXCEPTION_GP);
 		cpu.cr0&=(~CR0_TASKSWITCH);
 		break;
-//	CASE_0F_B(0x08)												/* INVD */
-//	CASE_0F_B(0x09)												/* WBINVD */
-//		goto illegal_opcode;
+	CASE_0F_B(0x08)												/* INVD */
+	CASE_0F_B(0x09)												/* WBINVD */
+		goto illegal_opcode;
 	CASE_0F_B(0x20)												/* MOV Rd.CRx */
 		{
 			GetRM;
@@ -208,8 +208,8 @@
 			if (CPU_WRITE_TRX(which,*eard)) RUNEXCEPTION();
 		}
 		break;
-//	CASE_0F_B(0x31)												/* RDTSC */
-//		goto illegal_opcode;
+	CASE_0F_B(0x31)												/* RDTSC */
+		goto illegal_opcode;
 	CASE_0F_W(0x80)												/* JO */
 		JumpCond16_w(TFLG_O);
 	CASE_0F_W(0x81)												/* JNO */
@@ -363,9 +363,9 @@
 	CASE_0F_W(0xaf)												/* IMUL Gw,Ew */
 		RMGwEwOp3(DIMULW, *rmrw);
 		break;
-//	CASE_0F_B(0xb0) 										/* cmpxchg Eb,Gb */
-//	CASE_0F_W(0xb1) 										/* cmpxchg Ew,Gw */
-//		goto illegal_opcode;
+	CASE_0F_B(0xb0) 											/* cmpxchg Eb,Gb */
+	CASE_0F_W(0xb1) 											/* cmpxchg Ew,Gw */
+		goto illegal_opcode;
 	CASE_0F_W(0xb2)												/* LSS Ew */
 		{	
 		GetRMrw;
@@ -598,15 +598,15 @@
 			}
 		break;
 		}
-//	CASE_0F_B(0xc0)												/* XADD Gb,Eb */
-//	CASE_0F_W(0xc1)												/* XADD Gw,Ew */
-//	CASE_0F_W(0xc8)												/* BSWAP AX */
-//	CASE_0F_W(0xc9)												/* BSWAP CX */
-//	CASE_0F_W(0xca)												/* BSWAP DX */
-//	CASE_0F_W(0xcb)												/* BSWAP BX */
-//	CASE_0F_W(0xcc)												/* BSWAP SP */
-//	CASE_0F_W(0xcd)												/* BSWAP BP */
-//	CASE_0F_W(0xce)												/* BSWAP SI */
-//	CASE_0F_W(0xcf)												/* BSWAP DI */
-//		goto illegal_opcode;
+	CASE_0F_B(0xc0)												/* XADD Gb,Eb */
+	CASE_0F_W(0xc1)												/* XADD Gw,Ew */
+	CASE_0F_W(0xc8)												/* BSWAP AX */
+	CASE_0F_W(0xc9)												/* BSWAP CX */
+	CASE_0F_W(0xca)												/* BSWAP DX */
+	CASE_0F_W(0xcb)												/* BSWAP BX */
+	CASE_0F_W(0xcc)												/* BSWAP SP */
+	CASE_0F_W(0xcd)												/* BSWAP BP */
+	CASE_0F_W(0xce)												/* BSWAP SI */
+	CASE_0F_W(0xcf)												/* BSWAP DI */
+		goto illegal_opcode;
 		

@@ -1,30 +1,21 @@
 ﻿#include <stdlib.h>
 #include <stdio.h>
-#include <stdarg.h>
 #include <sys/types.h>
-#include <signal.h>
-
 #include "SDL.h"
 #include "..\..\SDL-1.2.15\include\SDL_syswm.h"
 #include "sdl_ttf.h"
-
 #include "vDos.h"
 #include "video.h"
 #include "mouse.h"
-#include "setup.h"
-#include "support.h"
-#include "control.h"
 #include "bios.h"
 #include "vDosTTF.h"
-
 #include "render.h"
 #include "vga.h"
 #include "..\ints\int10.h"
-
+#include "dos_inc.h"
 #include <Shellapi.h>
 
 #define WIN32_LEAN_AND_MEAN
-#include <windows.h>
 
 #define WM_SC_SYSMENUABOUT		0x1110						// Pretty arbitrary, just needs to be < 0xF000
 #define WM_SC_SYSMENUPCOPY		(WM_SC_SYSMENUABOUT + 1)
@@ -137,7 +128,6 @@ bool GFX_StartUpdate()
 			winHidden = false;
 			TimedSetSize();
 			}
-
 	if (!sdl.active || sdl.updating)
 		return false;
 	sdl.updating = true;
@@ -179,22 +169,21 @@ void GFX_SelectFontByPoints(int ptsize)
 			MultiByteToWideChar(cp, 0, (char*)cTest, 256, (LPWSTR)wcTest, size);
 			Bit16u unimap;	
 			bool notMapped = false;
-			for (int y = 8; y < 16; y++)
-				for (int x = 0; x < 16; x++)
+			for (int c = 128 + (TTF_GlyphIsProvided(ttf.SDL_font, 0x20ac) ? 1 : 0); c < 256; c++)		// Check all characters above 128 (128 = always Euro symbol if defined in font)
+				{
+				unimap = wcTest[c];
+				if (!TTF_GlyphIsProvided(ttf.SDL_font, unimap))
 					{
-					unimap = wcTest[y*16+x];
-					if (!TTF_GlyphIsProvided(ttf.SDL_font, unimap))
+					if (!notMapped)
 						{
-						if (!notMapped)
-							{
-							LOG_MSG("ASCII Unicode Fixed");
-							notMapped = true;
-							}
-						LOG_MSG("  %3d    %4x  %4x", y*16+x, unimap, cpMap[y*16+x]);
+						LOG_MSG("ASCII Unicode Fixups");
+						notMapped = true;
 						}
-					else
-						cpMap[y*16+x] = unimap;
+					LOG_MSG("  %3d    %4x  %4x", c, unimap, cpMap[c]);
 					}
+				else 
+					cpMap[c] = unimap;
+				}
 			}
 		}
 	}
@@ -303,7 +292,15 @@ void GFX_EndTextLines(void)
 
 				Bit8u colorBG = newAC[x]>>12;
 				Bit8u colorFG = (newAC[x]>>8)&15;
-
+/*
+if ((colorFG & 7) == 1)
+	{
+	TTF_SetFontStyle(ttf.SDL_font, TTF_STYLE_UNDERLINE);
+	colorFG |= 7;
+	}
+else
+	TTF_SetFontStyle(ttf.SDL_font, TTF_STYLE_NORMAL);
+*/
 				if (wpVersion > 0)																// If WP and not negative (color value to text attribute excluded)
 					{
 					if (colorFG == 0xe && colorBG == 1)
@@ -550,17 +547,6 @@ static void increaseFontSize()
 		}
 	}
 
-static void GUI_ShutDown(Section * /*sec*/)
-	{
-	GFX_EndUpdate();
-	if (sdl.active)
-		{
-		RENDER_Halt();	
-		sdl.active = false;
-		}
-	}
-
-
 void readTTF(const char *fName)												// Open and read alternative font
 	{
 	FILE * ttf_fh;
@@ -720,23 +706,8 @@ bool setWinInitial(const char *winDef)
 	return false;
 	}
 
-void configError(const char * option, const char * mess)
+void GUI_StartUp()
 	{
-	std::string errors = "CONFIG.TXT - unresolved ";
-	errors += option;
-	errors += " parameter(s):\n";
-	std::string descr = mess;
-	if (descr.length() > 40)
-		errors += "\n" + descr.substr(0, 37) + "...";
-	else
-		errors += "\n" + descr;
-	MessageBox(NULL, errors.c_str(), "vDos - Warning", MB_OK|MB_ICONWARNING);
-	}
-
-void GUI_StartUp(Section * sec)
-	{
-	sec->AddDestroyFunction(&GUI_ShutDown);
-
 	SDL_WM_SetCaption("vDos", "vDos");
 	SDL_SysWMinfo wminfo;
 	SDL_VERSION(&wminfo.version);
@@ -744,34 +715,38 @@ void GUI_StartUp(Section * sec)
 	sdlHwnd = wminfo.window;
 
 	SetClassLong(sdlHwnd, GCL_HICON, (LONG)LoadIcon(GetModuleHandle(NULL), "vDos_ico"));	// set vDos (SDL) icon
-	const char * fName = static_cast<Section_prop *>(control->GetSection())->Get_string("font");
+	const char * fName = ConfGetString("font");
 	if (*fName)
 		readTTF(fName);
 	else
 		ttf.vDos = true;;
 
-	ttf.lins = static_cast<Section_prop *>(control->GetSection())->Get_int("lins");
+	ttf.lins =ConfGetInt("lins");
 	ttf.lins = max(24, min(txtMaxLins, ttf.lins));
-	ttf.cols = static_cast<Section_prop *>(control->GetSection())->Get_int("cols");
+	ttf.cols = ConfGetInt("cols");
 	ttf.cols = max(80, min(txtMaxCols, ttf.cols));
 	for (Bitu i = 0; ModeList_VGA[i].mode != 0xffff; i++)										// set the cols and lins in video mode 3
-		if (ModeList_VGA[i].mode == 3)
+		if (ModeList_VGA[i].mode == 3 || (ModeList_VGA[i].mode == 7))
 			{
 			ModeList_VGA[i].twidth = ttf.cols;
 			ModeList_VGA[i].theight = ttf.lins;
 			break;
 			}
 
-	int hide10th = static_cast<Section_prop *>(control->GetSection())->Get_int("hide");			// hide window for a while (10ths of a second)
+	int hide10th = ConfGetInt("hide");															// hide window for a while (10ths of a second)
 //	hideWinTill = GetTickCount64();																// Only supported by Vista and up
 	hideWinTill = GetTickCount();
 	if (hide10th > 0)
 		hideWinTill += hide10th*100;
-	usesMouse = static_cast<Section_prop *>(control->GetSection())->Get_bool("mouse");
-	wpVersion = static_cast<Section_prop *>(control->GetSection())->Get_int("wp");				// If negative, exclude some WP stuff in the future
-	winFramed = static_cast<Section_prop *>(control->GetSection())->Get_bool("frame");
-	sdl.scale = static_cast<Section_prop *>(control->GetSection())->Get_int("scale");
-	const char * colors = static_cast<Section_prop *>(control->GetSection())->Get_string("colors");
+	usesMouse = ConfGetBool("mouse");
+	wpVersion = ConfGetInt("wp");																// If negative, exclude some WP stuff in the future
+	winFramed = ConfGetBool("frame");
+	sdl.scale = ConfGetInt("scale");
+	char * colors = ConfGetString("colors");
+	// Next 3 lines temporary added to lock DOS colors in text mode
+	setColors("#000000 #0000aa #00aa00 #00aaaa #aa0000 #aa00aa #aa5500 #aaaaaa #555555 #5555ff #55ff55 #55ffff #ff5555 #ff55ff #ffff55 #ffffff");	// Standard DOS colors
+	rgbColors = altBGR1;
+	colorsLocked = true;
 	if (*colors)
 		{
 		if (setColors(colors))
@@ -780,11 +755,11 @@ void GUI_StartUp(Section * sec)
 			colorsLocked = true;
 			}
 		else
-			configError("COLORS=", colors);
+			ConfAddError("Invalid COLORS= parameters\n", colors);
 		}
-	const char * winDef = static_cast<Section_prop *>(control->GetSection())->Get_string("window");
+	char * winDef = ConfGetString("window");
 	if (!setWinInitial(winDef))
-		configError("WINDOW=", winDef);
+		ConfAddError("Invalid WINDOWS= parameters\n", winDef);
 	if (winPerc == 100)
 		ttf.fullScrn = true;
 
@@ -828,9 +803,15 @@ void GUI_StartUp(Section * sec)
 		}
 	if (ttf.vDos)																				// make it even for vDos internal font (a bit nicer)
 		curSize &= ~1;
-	GFX_SelectFontByPoints(curSize);
 
+	GFX_SelectFontByPoints(curSize);
 	HMENU hSysMenu = GetSystemMenu(sdlHwnd, FALSE);
+//	while (RemoveMenu(hSysMenu, 0, MF_BYPOSITION))
+//		;
+	RemoveMenu(hSysMenu, SC_MAXIMIZE, MF_BYCOMMAND);											// remove some useless items
+	RemoveMenu(hSysMenu, SC_SIZE, MF_BYCOMMAND);
+	RemoveMenu(hSysMenu, SC_RESTORE, MF_BYCOMMAND);
+
 	AppendMenu(hSysMenu, MF_SEPARATOR, NULL, "");
     AppendMenu(hSysMenu, MF_STRING, WM_SC_SYSMENUPCOPY,		MSG_Get("SYSMENU:COPY"));
     AppendMenu(hSysMenu, MF_STRING, WM_SC_SYSMENUPASTE,		MSG_Get("SYSMENU:PASTE"));
@@ -1191,9 +1172,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	try
 		{
 		MSG_Init();
-		Config myconf;
-		control = &myconf;
-		vDOS_Init();
 
 		if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_NOPARACHUTE))		// Init SDL
 			E_Exit("Could't init SDL, %s", SDL_GetError());
@@ -1204,12 +1182,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, 50);
 		SDL_EnableUNICODE(true);
 
-		control->ParseConfigFile();
-		
-		control->Init();											// Init all the sections
-		
-		control->StartUp();											// Start up main machine
-		// Shutdown everything
+		vDOS_Init();
 		}
 	catch (char * error)
 		{

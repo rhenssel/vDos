@@ -97,7 +97,7 @@ enum {
 	t_LASTFLAG
 };
 
-static INLINE void DestroyConditionFlags(void)
+static inline void DestroyConditionFlags(void)
 	{
 	lflags.type = t_UNKNOWN;
 	}

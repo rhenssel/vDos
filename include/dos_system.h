@@ -2,16 +2,9 @@
 #define vDOS_DOS_SYSTEM_H
 
 #include <vector>
-#ifndef VDOS_H
 #include "vDos.h"
-#endif
-
-//#ifndef VDOS_SUPPORT_H
 #include "support.h"
-//#endif
-#ifndef VDOS_MEM_H
 #include "mem.h"
-#endif
 
 #define DOS_NAMELENGTH 12
 #define DOS_NAMELENGTH_ASCII (DOS_NAMELENGTH+1)
@@ -137,13 +130,9 @@ enum {DOS_SEEK_SET = 0, DOS_SEEK_CUR = 1, DOS_SEEK_END = 2};
 */
 
 typedef bool (MultiplexHandler)(void);
-void DOS_AddMultiplexHandler(MultiplexHandler * handler);
-void DOS_DelMultiplexHandler(MultiplexHandler * handler);
 
 // AddDevice stores the pointer to a created device
 void DOS_AddDevice(DOS_Device * adddev);
-// DelDevice destroys the device that is pointed to.
-void DOS_DelDevice(DOS_Device * dev);
 
 void VFILE_Register(const char * name, Bit8u * data, Bit16u size);
 #endif

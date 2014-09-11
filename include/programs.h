@@ -1,22 +1,10 @@
 #ifndef vDOS_PROGRAMS_H
 #define vDOS_PROGRAMS_H
 
-#ifndef VDOS_H
 #include "vDos.h"
-#endif
-#ifndef vDOS_DOS_INC_H
 #include "dos_inc.h"
-#endif
-
-#ifndef CH_LIST
-#define CH_LIST
 #include <list>
-#endif
-
-#ifndef CH_STRING
-#define CH_STRING
 #include <string>
-#endif
 
 class CommandLine
 	{
@@ -24,17 +12,15 @@ public:
 	CommandLine(char const * const name, char const * const cmdline);
 	const char * GetFileName() {return file_name.c_str();}
 
-	bool FindString(char const * const name, std::string & value, bool remove = false);
-	const char * FindCommand(unsigned int which);
-	bool FindStringBegin(char const * const begin, std::string & value, bool remove=false);
-	bool FindStringRemain(char const * const name, std::string & value);
-	unsigned int GetCount(void);
+	bool FirstStart();
+	const char * GetVarNum(unsigned int which);
+	bool GetCommand(std::string & value);
 	void Shift(unsigned int amount = 1);
 private:
 	typedef std::list<std::string>::iterator cmd_it;
 	std::list<std::string> cmds;
 	std::string file_name;
-	bool FindEntry(char const * const name, cmd_it & it, bool neednext = false);
+	bool FindEntry(char const * const name, cmd_it & it);
 	};
 
 class Program {

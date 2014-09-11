@@ -1,6 +1,5 @@
 #include "dos_inc.h"
 #include "../ints/int10.h"
-#include <string.h>
 
 #define NUMBER_ANSI_DATA 10
 
@@ -45,11 +44,12 @@ bool device_CON::Read(Bit8u* data, Bit16u* size)
 		{
 		while (true)
 			{
-			reg_ah = 1;							// check for keystroke
+			reg_ah = 1;							// Check for keystroke
 			CALLBACK_RunRealInt(0x16);
 			if (!GETFLAG(ZF))
 				break;
-			CALLBACK_RunRealInt(0x28);
+			CALLBACK_Idle();					// To start vDos and let interrupts take place
+			Sleep(2);
 			}
 		reg_ah = 0x10;
 		CALLBACK_RunRealInt(0x16);
@@ -58,12 +58,12 @@ bool device_CON::Read(Bit8u* data, Bit16u* size)
 		case 13:
 			data[count++] = 0x0D;
 			if (*size > count)
-				data[count++] = 0x0A;			// it's only expanded if there is room for it. (NO cache)
+				data[count++] = 0x0A;			// It's only expanded if there is room for it. (NO cache)
 			*size = count;
 			reg_ax = oldax;
 			if (dos.echo)
 				{ 
-				INT10_TeletypeOutput(13, 7);	// maybe don't do this (no need for it actually, but it's compatible)
+				INT10_TeletypeOutput(13, 7);	// Maybe don't do this (no need for it actually, but it's compatible)
 				INT10_TeletypeOutput(10, 7);
 				}
 			return true;

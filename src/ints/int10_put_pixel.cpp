@@ -12,57 +12,6 @@ void INT10_PutPixel(Bit16u x, Bit16u y, Bit8u page, Bit8u color)
 
 	switch (CurMode->type)
 		{
-	case M_CGA4:
-		{
-		if (vPC_rLodsb(BIOSMEM_SEG, BIOSMEM_CURRENT_MODE) <= 5)
-			{
-			Bit16u off = (y>>1)*80+(x>>2);
-			if (y&1)
-				off += 8*1024;
-
-			Bit8u old = vPC_rLodsb(0xb800, off);
-			if (color & 0x80)
-				{
-				color &= 3;
-				old ^= color << (2*(3-(x&3)));
-				}
-			else
-				old = (old&cga_masks[x&3])|((color&3) << (2*(3-(x&3))));
-			vPC_rStosb(0xb800, off, old);
-			}
-		else
-			{
-			Bit16u off = (y>>2)*160+((x>>2)&(~1));
-			off += (8*1024) * (y & 3);
-
-			Bit16u old = vPC_rLodsw(0xb800, off);
-			if (color & 0x80)
-				{
-				old ^= (color&1) << (7-(x&7));
-				old ^= ((color&2)>>1) << ((7-(x&7))+8);
-				}
-			else
-				old = (old&(~(0x101<<(7-(x&7))))) | ((color&1) << (7-(x&7))) | (((color&2)>>1) << ((7-(x&7))+8));
-			vPC_rStosw(0xb800, off, old);
-			}
-		}
-		break;
-	case M_CGA2:
-		{
-		Bit16u off = (y>>1)*80+(x>>3);
-		if (y&1)
-			off += 8*1024;
-		Bit8u old = vPC_rLodsb(0xb800, off);
-		if (color & 0x80)
-			{
-			color &= 1;
-			old ^= color << ((7-(x&7)));
-			}
-		else
-			old = (old&cga_masks2[x&7])|((color&1) << ((7-(x&7))));
-		vPC_rStosb(0xb800,off,old);
-		}
-		break;
 	case M_EGA:
 		{
 		// Set the correct bitmask for the pixel position
@@ -121,24 +70,6 @@ void INT10_GetPixel(Bit16u x, Bit16u y, Bit8u page, Bit8u * color)
 	{
 	switch (CurMode->type)
 		{
-	case M_CGA4:
-		{
-		Bit16u off = (y>>1)*80+(x>>2);
-		if (y&1)
-			off += 8*1024;
-		Bit8u val = vPC_rLodsb(0xb800, off);
-		*color = (val>>(((3-(x&3)))*2)) & 3 ;
-		}
-		break;
-	case M_CGA2:
-		{
-		Bit16u off = (y>>1)*80+(x>>3);
-		if (y&1)
-			off+=8*1024;
-		Bit8u val = vPC_rLodsb(0xb800, off);
-		*color = (val>>(((7-(x&7))))) & 1 ;
-		}
-		break;
 	case M_EGA:
 		{
 		// Calculate where the pixel is in video memory
@@ -166,9 +97,6 @@ void INT10_GetPixel(Bit16u x, Bit16u y, Bit8u page, Bit8u * color)
 		}
 	case M_VGA:
 		*color = vPC_rLodsb(SegOff2Ptr(0xa000, 320*y+x));
-		break;
-	default:
-		LOG(LOG_INT10,LOG_ERROR)("GetPixel unhandled mode type %d", CurMode->type);
 		break;
 		}	
 	}

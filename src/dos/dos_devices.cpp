@@ -2,14 +2,8 @@
 #include "vDos.h"
 #include "callback.h"
 #include "regs.h"
-#include "mem.h"
 #include "bios.h"
-#include "dos_inc.h"
-#include "support.h"
-#include "parport.h"
-#include "drives.h"			//Wildcmp
-// Include all the devices
-
+#include "drives.h"								// WildFileCmp
 #include "dev_con.h"
 
 DOS_Device * Devices[DOS_DEVICES];
@@ -148,19 +142,6 @@ void DOS_AddDevice(DOS_Device * adddev)
 			return;
 			}
 	E_Exit("DOS: Too many devices");
-	}
-
-void DOS_DelDevice(DOS_Device * dev)
-	{
-	// We will destroy the device if we find it in our list.
-	// TODO: The file table is not checked to see the device is opened somewhere!
-	for (Bitu i = 0; i < DOS_DEVICES; i++)
-		if (Devices[i] && !stricmp(Devices[i]->name, dev->name))
-			{
-			delete Devices[i];
-			Devices[i] = 0;
-			return;
-			}
 	}
 
 void DOS_SetupDevices(void)

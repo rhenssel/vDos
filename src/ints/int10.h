@@ -1,4 +1,5 @@
 #include "vga.h"
+#include "mem.h"
 
 #define S3_LFB_BASE		0xC0000000
 
@@ -80,7 +81,6 @@ struct VideoModeBlock {
 
 	Bitu	htotal, vtotal;
 	Bitu	hdispend, vdispend;
-	Bitu	special;
 };
 
 extern VideoModeBlock ModeList_VGA[];
@@ -136,11 +136,8 @@ void INT10_PutPixel(Bit16u x, Bit16u y, Bit8u page, Bit8u color);
 void INT10_GetPixel(Bit16u x, Bit16u y, Bit8u page, Bit8u * color);
 
 /* Palette Group */
-void INT10_SetBackgroundBorder(Bit8u val);
-void INT10_SetColorSelect(Bit8u val);
 void INT10_SetSinglePaletteRegister(Bit8u reg, Bit8u val);
 void INT10_SetAllPaletteRegisters(PhysPt data);
-void INT10_ToggleBlinkingBit(Bit8u state);
 void INT10_GetSinglePaletteRegister(Bit8u reg,Bit8u * val);
 void INT10_GetAllPaletteRegisters(PhysPt data);
 void INT10_SetSingleDACRegister(Bit8u index, Bit8u red, Bit8u green, Bit8u blue);

@@ -9,42 +9,41 @@ static Bit16u dos_memseg = DOS_PRIVATE_SEGMENT;
 
 Bit16u DOS_GetMemory(Bit16u pages)
 	{
-	if ((Bitu)pages + (Bitu)dos_memseg >= DOS_PRIVATE_SEGMENT_END)
-		E_Exit("DOS: Not enough memory for internal tables");
 	Bit16u page = dos_memseg;
 	dos_memseg += pages;
+	if (dos_memseg > DOS_PRIVATE_SEGMENT_END)
+		E_Exit("DOS: Not enough memory for internal tables");
 	return page;
 	}
 
 static Bitu DOS_CaseMapFunc(void)
 	{
-	// LOG(LOG_DOSMISC,LOG_ERROR)("Case map routine called : %c",reg_al);
 	return CBRET_NONE;
 	}
 
 static Bit8u country_info[0x22] = {
-/* Date format      */  0x00, 0x00,
-/* Currencystring   */  0x24, 0x00, 0x00, 0x00, 0x00,
-/* Thousands sep    */  0x2c, 0x00,
-/* Decimal sep      */  0x2e, 0x00,
-/* Date sep         */  0x2d, 0x00,
-/* time sep         */  0x3a, 0x00,
-/* currency form    */  0x00,
-/* digits after dec */  0x02,
-/* Time format      */  0x00,
-/* Casemap          */  0x00, 0x00, 0x00, 0x00,
-/* Data sep         */  0x2c, 0x00,
-/* Reservered 5     */  0x00, 0x00, 0x00, 0x00, 0x00,
-/* Reservered 5     */  0x00, 0x00, 0x00, 0x00, 0x00
+	0x00, 0x00,										// Date format
+	0x24, 0x00, 0x00, 0x00, 0x00,					// Currencystring
+	0x2c, 0x00,										// Thousands sep
+	0x2e, 0x00,										// Decimal sep
+	0x2d, 0x00,										// Date sep
+	0x3a, 0x00,										// Time sep
+	0x00,											// Currency form
+	0x02,											// Digits after dec
+	0x00,											// Time format
+	0x00, 0x00, 0x00, 0x00,							// Casemap
+	0x2c, 0x00,										// Data sep
+	0x00, 0x00, 0x00, 0x00, 0x00,					// Reservered 5
+	0x00, 0x00, 0x00, 0x00, 0x00					// Reservered 5
 };
 
 static Bit8u filenamechartable[0x18] = {
 	0x16, 0x00, 0x01,
-	0x00, 0xff,		// allowed chars from .. to
+	0x00, 0xff,										// Allowed chars from .. to
 	0x00,
-	0x00, 0x20,		// excluded chars from .. to
+	0x00, 0x20,										// Excluded chars from .. to
 	0x02,
-	0x0e,			// number of illegal separators
+	0x0e,											// Number of illegal separators
 	0x2e, 0x22, 0x2f, 0x5c, 0x5b, 0x5d, 0x3a, 0x7c, 0x3c, 0x3e, 0x2b, 0x3d, 0x3b, 0x2c
 };
 
@@ -59,8 +58,7 @@ void DOS_SetupTables(void)
 	// Create the DOS Info Block
 	dos_infoblock.SetLocation(DOS_INFOBLOCK_SEG);	// c2woody
    
-	// create SDA
-	DOS_SDA(DOS_SDA_SEG, 0).Init();
+	DOS_SDA(DOS_SDA_SEG, 0).Init();					// Create SDA
 
 	// Some weird files >20 detection routine
 	// Possibly obselete when SFT is properly handled
@@ -68,13 +66,13 @@ void DOS_SetupTables(void)
 	vPC_rStosd(DOS_CONSTRING_SEG, 0x1a, 0x204e4f43);
 	vPC_rStosd(DOS_CONSTRING_SEG, 0x2a, 0x204e4f43);
 
-	// create a CON device driver
+	// Create a CON device driver
 	seg = DOS_CONDRV_SEG;
- 	vPC_rStosd(seg, 0x00, 0xffffffff);	// next ptr
- 	vPC_rStosw(seg, 0x04, 0x8013);		// attributes
-  	vPC_rStosd(seg, 0x06, 0xffffffff);	// strategy routine
-  	vPC_rStosd(seg, 0x0a, 0x204e4f43);	// driver name
-  	vPC_rStosd(seg, 0x0e, 0x20202020);	// driver name
+ 	vPC_rStosd(seg, 0x00, 0xffffffff);				// Next ptr
+ 	vPC_rStosw(seg, 0x04, 0x8013);					// Attributes
+  	vPC_rStosd(seg, 0x06, 0xffffffff);				// Strategy routine
+  	vPC_rStosd(seg, 0x0a, 0x204e4f43);				// Driver name
+  	vPC_rStosd(seg, 0x0e, 0x20202020);				// Driver name
 	dos_infoblock.SetDeviceChainStart(SegOff2dWord(seg, 0));
    
 	// Create a fake Current Directory Structure

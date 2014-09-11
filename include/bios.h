@@ -93,13 +93,13 @@
 // maximum of scancodes handled by keyboard bios routines
 #define MAX_SCAN_CODE 0x58
 
-void BIOS_ZeroExtendedSize(bool in);
-
 void BIOS_PasteClipboard(Bit16u * data);				// to paste Windows clipboard to keyboard buffer
 
 bool BIOS_AddKeyToBuffer(Bit16u code);
 
 void BIOS_AddKey(Bit8u scancode, Bit16u unicode, bool pressed);
+bool BIOS_CheckKey(Bit16u &code);
+
 
 void BIOS_SetComPorts (Bit16u baseaddr[]);
 void BIOS_SetLPTPort (Bitu port, Bit16u baseaddr);

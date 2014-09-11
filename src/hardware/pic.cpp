@@ -1,12 +1,9 @@
-#include <list>
-
 #include "vDos.h"
 #include "inout.h"
 #include "cpu.h"
 #include "callback.h"
 #include "pic.h"
 #include "timer.h"
-#include "setup.h"
 
 #define PIC_QUEUESIZE 512
 
@@ -27,7 +24,6 @@ struct PIC_Controller {
 	bool rotate_on_auto_eoi;
 	bool single;
 	bool request_issr;
-	Bit8u vector_base;
 };
 
 Bitu PIC_Ticks = 0;
@@ -323,7 +319,7 @@ bool PIC_startIRQ(Bitu i)
 
 void PIC_runIRQs(void)
 	{
-	if (!GETFLAG(IF) || !PIC_IRQCheck || cpudecoder == CPU_Core_Normal_Trap_Run)
+	if (!GETFLAG(IF) || !PIC_IRQCheck)
 		return;
 	static Bitu IRQ_priority_order[16] = {0, 1, 2, 8, 9, 10, 11, 12, 13, 14, 15, 3, 4, 5, 6, 7};
 	static Bit16u IRQ_priority_lookup[17] = {0, 1, 2, 11, 12, 13, 14, 15, 3, 4, 5, 6, 7, 8, 9, 10, 16};
@@ -441,46 +437,13 @@ static float srv_lag = 0;
 void PIC_AddEvent(PIC_EventHandler handler, float delay, Bitu val)
 	{
 	if (!pic_queue.free_entry)
-		{
-		LOG(LOG_PIC, LOG_ERROR)("Event queue full");
 		return;
-		}
 	PICEntry * entry = pic_queue.free_entry;
 	entry->index = delay + (InEventService ? srv_lag : PIC_TickIndex());
 	entry->pic_event = handler;
 	entry->value = val;
 	pic_queue.free_entry = pic_queue.free_entry->next;
 	AddEntry(entry);
-	}
-
-void PIC_RemoveSpecificEvents(PIC_EventHandler handler, Bitu val)
-	{
-	PICEntry * entry = pic_queue.next_entry;
-	PICEntry * prev_entry = 0;
-	while (entry)
-		{
-		if ((entry->pic_event == handler) && (entry->value == val))
-			{
-			if (prev_entry)
-				{
-				prev_entry->next = entry->next;
-				entry->next = pic_queue.free_entry;
-				pic_queue.free_entry = entry;
-				entry = prev_entry->next;
-				continue;
-				}
-			else
-				{
-				pic_queue.next_entry = entry->next;
-				entry->next = pic_queue.free_entry;
-				pic_queue.free_entry = entry;
-				entry = pic_queue.next_entry;
-				continue;
-				}
-			}
-		prev_entry = entry;
-		entry = entry->next;
-		}	
 	}
 
 void PIC_RemoveEvents(PIC_EventHandler handler)
@@ -571,72 +534,53 @@ void TIMER_AddTick(void)
 	}
 
 
-class PIC:public Module_base
+static 	IO_ReadHandleObject ReadHandler[4];
+static	IO_WriteHandleObject WriteHandler[4];
+
+void PIC_Init()
 	{
-private:
-	IO_ReadHandleObject ReadHandler[4];
-	IO_WriteHandleObject WriteHandler[4];
-public:
-	PIC(Section* configuration):Module_base(configuration)
+	// Setup pic0 and pic1 with initial values like DOS has normally
+	PIC_IRQCheck = 0;
+	PIC_IRQActive = PIC_NOIRQ;
+	PIC_Ticks = 0;
+	for (Bitu i = 0; i < 2; i++)
 		{
-		// Setup pic0 and pic1 with initial values like DOS has normally
-		PIC_IRQCheck = 0;
-		PIC_IRQActive = PIC_NOIRQ;
-		PIC_Ticks = 0;
-		for (Bitu i = 0; i < 2; i++)
-			{
-			pics[i].masked = 0xff;
-			pics[i].auto_eoi = false;
-			pics[i].rotate_on_auto_eoi = false;
-			pics[i].request_issr = false;
-			pics[i].special = false;
-			pics[i].single = false;
-			pics[i].icw_index = 0;
-			pics[i].icw_words = 0;
-			}
-		for (Bitu i = 0; i <= 7; i++)
-			{
-			irqs[i].active = false;
-			irqs[i].masked = true;
-			irqs[i].inservice = false;
-			irqs[i+8].active = false;
-			irqs[i+8].masked = true;
-			irqs[i+8].inservice = false;
-			irqs[i].vector = 0x8+i;
-			irqs[i+8].vector = 0x70+i;	
-			}
-		irqs[0].masked = false;					// Enable system timer
-		irqs[1].masked = false;					// Enable Keyboard IRQ
-		irqs[2].masked = false;					// Enable second pic
-		irqs[8].masked = false;					// Enable RTC IRQ
-		ReadHandler[0].Install(0x20, read_command, IO_MB);
-		ReadHandler[1].Install(0x21, read_data, IO_MB);
-		WriteHandler[0].Install(0x20, write_command, IO_MB);
-		WriteHandler[1].Install(0x21, write_data, IO_MB);
-		ReadHandler[2].Install(0xa0, read_command, IO_MB);
-		ReadHandler[3].Install(0xa1, read_data, IO_MB);
-		WriteHandler[2].Install(0xa0, write_command, IO_MB);
-		WriteHandler[3].Install(0xa1, write_data, IO_MB);
-		// Initialize the pic queue
-		for (Bitu i = 0; i < PIC_QUEUESIZE-1; i++)
-			pic_queue.entries[i].next = &pic_queue.entries[i+1];
-		pic_queue.entries[PIC_QUEUESIZE-1].next = 0;
-		pic_queue.free_entry = &pic_queue.entries[0];
-		pic_queue.next_entry = 0;
+		pics[i].masked = 0xff;
+		pics[i].auto_eoi = false;
+		pics[i].rotate_on_auto_eoi = false;
+		pics[i].request_issr = false;
+		pics[i].special = false;
+		pics[i].single = false;
+		pics[i].icw_index = 0;
+		pics[i].icw_words = 0;
 		}
-	~PIC(){
-	}
-};
-
-static PIC* test;
-
-void PIC_Destroy(Section* sec)
-	{
-	delete test;
-	}
-
-void PIC_Init(Section* sec)
-	{
-	test = new PIC(sec);
-	sec->AddDestroyFunction(&PIC_Destroy);
+	for (Bitu i = 0; i <= 7; i++)
+		{
+		irqs[i].active = false;
+		irqs[i].masked = true;
+		irqs[i].inservice = false;
+		irqs[i+8].active = false;
+		irqs[i+8].masked = true;
+		irqs[i+8].inservice = false;
+		irqs[i].vector = 0x8+i;
+		irqs[i+8].vector = 0x70+i;	
+		}
+	irqs[0].masked = false;					// Enable system timer
+	irqs[1].masked = false;					// Enable Keyboard IRQ
+	irqs[2].masked = false;					// Enable second pic
+	irqs[8].masked = false;					// Enable RTC IRQ
+	ReadHandler[0].Install(0x20, read_command, IO_MB);
+	ReadHandler[1].Install(0x21, read_data, IO_MB);
+	WriteHandler[0].Install(0x20, write_command, IO_MB);
+	WriteHandler[1].Install(0x21, write_data, IO_MB);
+	ReadHandler[2].Install(0xa0, read_command, IO_MB);
+	ReadHandler[3].Install(0xa1, read_data, IO_MB);
+	WriteHandler[2].Install(0xa0, write_command, IO_MB);
+	WriteHandler[3].Install(0xa1, write_data, IO_MB);
+	// Initialize the pic queue
+	for (Bitu i = 0; i < PIC_QUEUESIZE-1; i++)
+		pic_queue.entries[i].next = &pic_queue.entries[i+1];
+	pic_queue.entries[PIC_QUEUESIZE-1].next = 0;
+	pic_queue.free_entry = &pic_queue.entries[0];
+	pic_queue.next_entry = 0;
 	}

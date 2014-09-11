@@ -233,6 +233,9 @@
     <ClCompile Include="..\src\vdos.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\ints\ems.cpp">
+      <Filter>Source Files\ints</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\src\winres.rc">

@@ -6,6 +6,7 @@
 #include "inout.h"
 #include "dos_inc.h"
 #include "SDL.h"
+#include "CPU.h"
 
 static Bitu call_int16, call_irq1;
 
@@ -194,11 +195,7 @@ static bool get_key(Bit16u &code)
 	{
 	Bit16u head	= vPC_rLodsw(BIOS_KEYBOARD_BUFFER_HEAD);
 	if (head == vPC_rLodsw(BIOS_KEYBOARD_BUFFER_TAIL))
-		{
-		idleCount++;
 		return false;
-		}
-	idleCount = 0;
 	Bit16u thead = head+2;
 	if (thead >= vPC_rLodsw(BIOS_KEYBOARD_BUFFER_END))
 		thead = vPC_rLodsw(BIOS_KEYBOARD_BUFFER_START);
@@ -208,15 +205,11 @@ static bool get_key(Bit16u &code)
 	return true;
 	}
 
-static bool check_key(Bit16u &code)
+bool BIOS_CheckKey(Bit16u &code)
 	{
 	Bit16u head = vPC_rLodsw(BIOS_KEYBOARD_BUFFER_HEAD);
 	if (head == vPC_rLodsw(BIOS_KEYBOARD_BUFFER_TAIL))
-		{
-		idleCount++;
 		return false;
-		}
-	idleCount = 0;
 	code = vPC_rLodsw(0x40, head);
 	return true;
 	}
@@ -293,6 +286,11 @@ void BIOS_AddKey(Bit8u scancode, Bit16u unicode, bool pressed)
 			}
 		}
 	vPC_rStosb(BIOS_KEYBOARD_TOKEN, 0);										// reset if another key
+// Look at this:
+//      if (scancode == 0x46) {
+//			CPU_HW_Interrupt(0x1b);
+//			return;
+//		}
 
 	if (scancode >= 0x3b && scancode <= 0x44)								// F1 - F10
 		{
@@ -409,62 +407,61 @@ static Bitu INT16_Handler(void)
 	UpdateKBflags();
 	switch (reg_ah)
 		{
-	case 0x00:											// GET KEYSTROKE
-		if ((get_key(temp)) && (!IsEnhancedKey(temp)))	// normal key found, return translated key in ax
+	case 0x00:											// Get keystroke
+		if ((get_key(temp)) && (!IsEnhancedKey(temp)))	// Normal key found, return translated key in ax
 			reg_ax = temp;
 		else
-			reg_ip += 1;								// enter small idle loop to allow for irqs to happen
+			reg_ip += 1;								// Enter small idle loop to allow for irqs to happen
 		break;
-	case 0x10:											// GET KEYSTROKE (enhanced keyboards only)
+	case 0x10:											// Get keystroke (enhanced keyboards only)
 		if (get_key(temp))
 			{
-			if (((temp&0xff) == 0xf0) && (temp>>8))		// special enhanced key, clear low part before returning key
+			if (((temp&0xff) == 0xf0) && (temp>>8))		// Special enhanced key, clear low part before returning key
 				temp &= 0xff00;
 			reg_ax = temp;
 			}
 		else
-			reg_ip += 1;								// enter small idle loop to allow for irqs to happen
+			reg_ip += 1;								// Enter small idle loop to allow for irqs to happen
 		break;
-	case 0x01:											// CHECK FOR KEYSTROKE
-		vPC_rStosw(SegPhys(ss)+reg_sp+4, (vPC_rLodsw(SegPhys(ss)+reg_sp+4) | FLAG_IF));	// enable interrupt-flag after IRET of this int16
+	case 0x01:											// Check for keystroke
+//		vPC_rStosw(SegPhys(ss)+reg_sp+4, (vPC_rLodsw(SegPhys(ss)+reg_sp+4) | FLAG_IF));	// Enable interrupt-flag after IRET of this int16
 		for (;;)
 			{
-			if (check_key(temp))
+			if (BIOS_CheckKey(temp))
 				{
-				if (!IsEnhancedKey(temp))				// normal key, return translated key in ax
+				if (!IsEnhancedKey(temp))				// Normal key, return translated key in ax
 					{
-					CALLBACK_SZF(false);
 					reg_ax = temp;
+					CALLBACK_SZF(false);
 					break;
 					}
-				else									// remove enhanced key from buffer and ignore it
+				else									// Remove enhanced key from buffer and ignore it
 					get_key(temp);
 				}
-			else	// no key available
+			else										// No key available
 				{
-				CALLBACK_Idle();						// to release time if a program is polling keyboard
 				CALLBACK_SZF(true);
 				break;
 				}
 			}
 		break;
-	case 0x11:											// CHECK FOR KEYSTROKE (enhanced keyboards only)
-		if (!check_key(temp))
+	case 0x11:											// Check for keystroke (enhanced keyboards only)
+		if (!BIOS_CheckKey(temp))
 			CALLBACK_SZF(true);
 		else
 			{
 			CALLBACK_SZF(false);
-			if (((temp&0xff) == 0xf0) && (temp>>8))		// special enhanced key, clear low part before returning key
+			if (((temp&0xff) == 0xf0) && (temp>>8))		// Special enhanced key, clear low part before returning key
 				temp &= 0xff00;
 			reg_ax = temp;
 			}
 		break;
-	case 0x02:											// GET SHIFT FlAGS
+	case 0x02:											// Get shift flags
 		reg_al = vPC_rLodsb(BIOS_KEYBOARD_FLAGS1);
 		break;
-	case 0x03:											// SET TYPEMATIC RATE AND DELAY
+	case 0x03:											// Set typematic rate and delay
 		break;
-	case 0x05:											// STORE KEYSTROKE IN KEYBOARD BUFFER
+	case 0x05:											// Store keystroke in keyboard buffer
 		if (BIOS_AddKeyToBuffer(reg_cx))
 			reg_al = 0;
 		else
@@ -481,15 +478,15 @@ static Bitu INT16_Handler(void)
 void BIOS_SetupKeyboard(void)
 	{
 	// Setup the variables for keyboard in the bios data segment
-	vPC_rStosw(BIOS_KEYBOARD_BUFFER_START, 0x1e);
-	vPC_rStosw(BIOS_KEYBOARD_BUFFER_END, 0x3e);
-	vPC_rStosw(BIOS_KEYBOARD_BUFFER_HEAD, 0x1e);
-	vPC_rStosw(BIOS_KEYBOARD_BUFFER_TAIL, 0x1e);
-	vPC_rStosb(BIOS_KEYBOARD_FLAGS1, 0);
-	vPC_rStosb(BIOS_KEYBOARD_FLAGS2, 0);
-	vPC_rStosb(BIOS_KEYBOARD_FLAGS3, 0x10);		// Enhanced keyboard installed
-	vPC_rStosb(BIOS_KEYBOARD_TOKEN, 0);
-	vPC_rStosb(BIOS_KEYBOARD_LEDS, 0);
+	vPC_aStosw(BIOS_KEYBOARD_BUFFER_START, 0x1e);
+	vPC_aStosw(BIOS_KEYBOARD_BUFFER_END, 0x3e);
+	vPC_aStosw(BIOS_KEYBOARD_BUFFER_HEAD, 0x1e);
+	vPC_aStosw(BIOS_KEYBOARD_BUFFER_TAIL, 0x1e);
+	vPC_aStosb(BIOS_KEYBOARD_FLAGS1, 0);
+	vPC_aStosb(BIOS_KEYBOARD_FLAGS2, 0);
+	vPC_aStosb(BIOS_KEYBOARD_FLAGS3, 0x10);				// Enhanced keyboard installed
+	vPC_aStosb(BIOS_KEYBOARD_TOKEN, 0);
+	vPC_aStosb(BIOS_KEYBOARD_LEDS, 0);
 
 	// Allocate/setup a callback for int 0x16 and for standard IRQ 1 handler
 	call_int16 = CALLBACK_Allocate();	

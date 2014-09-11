@@ -18,7 +18,7 @@ static void write_p3cf(Bitu port, Bitu val, Bitu iolen)
 	{
 	switch (gfx(index))
 		{
-	case 0:		// Set/Reset Register
+	case 0:																			// Set/reset register
 		gfx(set_reset) = val & 0x0f;
 		vga.config.full_set_reset = FillTable[val & 0x0f];
 		vga.config.full_enable_and_set_reset = vga.config.full_set_reset & 	vga.config.full_enable_set_reset;
@@ -31,16 +31,15 @@ static void write_p3cf(Bitu port, Bitu val, Bitu iolen)
 			2	Same for plane 2 and bit 2 of 3CEh index 1.
 			3	Same for plane 3 and bit 3 of 3CEh index 1.
 		*/
-//		LOG_DEBUG("Set Reset = %2X",val);
 		break;
-	case 1:		// Enable Set/Reset Register
+	case 1:																			// Enable set/reset Register
 		gfx(enable_set_reset) = val & 0x0f;
 		vga.config.full_enable_set_reset = FillTable[val & 0x0f];
 		vga.config.full_not_enable_set_reset = ~vga.config.full_enable_set_reset;
 		vga.config.full_enable_and_set_reset = vga.config.full_set_reset & vga.config.full_enable_set_reset;
 //		if (gfx(enable_set_reset)) vga.config.mh_mask|=MH_SETRESET else vga.config.mh_mask&=~MH_SETRESET;
 		break;
-	case 2:		// Color Compare Register
+	case 2:																			// Color compare register
 		gfx(color_compare) = val & 0x0f;
 		/*
 			0-3	In Read Mode 1 each pixel at the address of the byte read is compared
@@ -49,9 +48,8 @@ static void write_p3cf(Bitu port, Bitu val, Bitu iolen)
 				can exclude bitplanes from the comparison.
 		*/
 		vga.config.color_compare = val & 0xf;
-//		LOG_DEBUG("Color Compare = %2X",val);
 		break;
-	case 3:		// Data Rotate
+	case 3:																			// Data rotate
 		gfx(data_rotate) = val;
 		vga.config.data_rotate = val & 7;
 //		if (val) vga.config.mh_mask|=MH_ROTATEOP else vga.config.mh_mask&=~MH_ROTATEOP;
@@ -68,13 +66,12 @@ static void write_p3cf(Bitu port, Bitu val, Bitu iolen)
 				3: CPU data is XORed with the latched data.
 		*/
 		break;
-	case 4:		// Read Map Select Register
+	case 4:																			// Read map select register
 		/*	0-1	number of the plane Read Mode 0 will read from */
 		gfx(read_map_select) = val & 0x03;
 		vga.config.read_map_select = val & 0x03;
-//		LOG_DEBUG("Read Map %2X",val);
 		break;
-	case 5:		// Mode Register
+	case 5:																			// Mode register
 		if ((gfx(mode) ^ val) & 0xf0)
 			{
 			gfx(mode) = val;
@@ -84,7 +81,6 @@ static void write_p3cf(Bitu port, Bitu val, Bitu iolen)
 			gfx(mode) = val;
 		vga.config.write_mode = val & 3;
 		vga.config.read_mode = (val >> 3) & 1;
-//		LOG_DEBUG("Write Mode %d Read Mode %d val %d",vga.config.write_mode,vga.config.read_mode,val);
 		/*
 			0-1	Write Mode: Controls how data from the CPU is transformed before
 				being written to display memory:
@@ -124,7 +120,7 @@ static void write_p3cf(Bitu port, Bitu val, Bitu iolen)
 			6	Enables 256 color mode if set.	
 		*/
 		break;
-	case 6:		// Miscellaneous Register
+	case 6:																			// Miscellaneous register
 		if ((gfx(miscellaneous) ^ val) & 0x0c)
 			{
 			gfx(miscellaneous) = val;
@@ -143,7 +139,7 @@ static void write_p3cf(Bitu port, Bitu val, Bitu iolen)
 				3: use B800h-BFFFh   CGA modes
 		*/
 		break;
-	case 7:		// Color Don't Care Register
+	case 7:																			// Color don't care register
 		gfx(color_dont_care) = val & 0x0f;
 		/*
 			0	Ignore bit plane 0 in Read mode 1 if clear.
@@ -152,12 +148,10 @@ static void write_p3cf(Bitu port, Bitu val, Bitu iolen)
 			3	Ignore bit plane 3 in Read mode 1 if clear.
 		*/
 		vga.config.color_dont_care = val & 0xf;
-//		LOG_DEBUG("Color don't care = %2X",val);
 		break;
-	case 8:		// Bit Mask Register
+	case 8:																			// Bit mask register
 		gfx(bit_mask) = val;
 		vga.config.full_bit_mask = ExpandTable[val];
-//		LOG_DEBUG("Bit mask %2X",val);
 		/*
 			0-7	Each bit if set enables writing to the corresponding bit of a byte in
 				display memory.
@@ -170,26 +164,26 @@ static Bitu read_p3cf(Bitu port, Bitu iolen)
 	{
 	switch (gfx(index))
 		{
-	case 0:		// Set/Reset Register
+	case 0:																			// Set/reset register
 		return gfx(set_reset);
-	case 1:		// Enable Set/Reset Register
+	case 1:																			// Enable set/reset register
 		return gfx(enable_set_reset);
-	case 2:		// Color Compare Register
+	case 2:																			// Color compare register
 		return gfx(color_compare);
-	case 3:		// Data Rotate
+	case 3:																			// Data rotate
 		return gfx(data_rotate);
-	case 4:		// Read Map Select Register
+	case 4:																			// Read map select register
 		return gfx(read_map_select);
-	case 5:		// Mode Register
+	case 5:																			// Mode register
 		return gfx(mode);
-	case 6:		// Miscellaneous Register
+	case 6:																			// Miscellaneous register
 		return gfx(miscellaneous);
-	case 7:		// Color Don't Care Register
+	case 7:																			// Color don't care register
 		return gfx(color_dont_care);
-	case 8:		// Bit Mask Register
+	case 8:																			// Bit mask register
 		return gfx(bit_mask);
 		}
-	return 0;		// Compiler happy
+	return 0;																		// Compiler happy
 	}
 
 void VGA_SetupGFX(void)

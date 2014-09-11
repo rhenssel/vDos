@@ -23,24 +23,21 @@ void vga_write_p3d5(Bitu port, Bitu val, Bitu iolen)
 	{
 	switch(crtc(index))
 		{
-	case 0x00:		// Horizontal Total Register
-		if (!crtc(read_only))
-			crtc(horizontal_total) = val;			// 0-7  Horizontal Total Character Clocks-5
+	case 0x00:																						// Horizontal total register
+		crtc(horizontal_total) = val;																// 0-7  horizontal total character clocks-5
 		break;
-	case 0x01:		// Horizontal Display End Register
-		if (!crtc(read_only) && val != crtc(horizontal_display_end))
+	case 0x01:																						// Horizontal display end register
+		if (val != crtc(horizontal_display_end))
 			{
-			crtc(horizontal_display_end) = val;		// 0-7  Number of Character Clocks Displayed -1
+			crtc(horizontal_display_end) = val;														// 0-7  number of character clocks displayed -1
 			VGA_StartResize();
 			}
 		break;
-	case 0x02:		// Start Horizontal Blanking Register
-		if (!crtc(read_only))
-			crtc(start_horizontal_blanking) = val;	// 0-7  The count at which Horizontal Blanking starts
+	case 0x02:																						// Start horizontal blanking register
+		crtc(start_horizontal_blanking) = val;														// 0-7  the count at which horizontal blanking starts
 		break;
-	case 0x03:		// End Horizontal Blanking Register
-		if (!crtc(read_only))
-			crtc(end_horizontal_blanking) = val;
+	case 0x03:																						// End horizontal blanking register
+		crtc(end_horizontal_blanking) = val;
 		/*
 			0-4	Horizontal Blanking ends when the last 6 bits of the character
 				counter equals this field. Bit 5 is at 3d4h index 5 bit 7.
@@ -50,13 +47,11 @@ void vga_write_p3d5(Bitu port, Bitu val, Bitu iolen)
 				index 10h and 11h access the Lightpen read back registers ??
 		*/
 		break;
-	case 0x04:		// Start Horizontal Retrace Register
-		if (!crtc(read_only))
-			crtc(start_horizontal_retrace) = val;	// 0-7  Horizontal Retrace starts when the Character Counter reaches this value.
+	case 0x04:																						// Start horizontal retrace register
+		crtc(start_horizontal_retrace) = val;														// 0-7  horizontal retrace starts when the character counter reaches this value.
 		break;
-	case 0x05:		// End Horizontal Retrace Register
-		if (!crtc(read_only))
-			crtc(end_horizontal_retrace) = val;
+	case 0x05:																						// End horizontal retrace register
+		crtc(end_horizontal_retrace) = val;
 		/*
 			0-4	Horizontal Retrace ends when the last 5 bits of the character counter
 				equals this value.
@@ -65,8 +60,8 @@ void vga_write_p3d5(Bitu port, Bitu val, Bitu iolen)
 			7	bit 5 of the End Horizontal Blanking count (See 3d4h index 3 bit 0-4)
 		*/	
 		break;
-	case 0x06:		// Vertical Total Register
-		if (!crtc(read_only) && val != crtc(vertical_total))
+	case 0x06:																						// Vertical total register
+		if (val != crtc(vertical_total))
 			{
 			crtc(vertical_total) = val;	
 			VGA_StartResize();
@@ -76,29 +71,12 @@ void vga_write_p3d5(Bitu port, Bitu val, Bitu iolen)
 			Note: For the VGA this value is the number of scan lines in the display -2.
 		*/
 		break;
-	case 0x07:		// Overflow Register
-		// Line compare bit ignores read only
-		vga.config.line_compare = (vga.config.line_compare & 0x6ff) | (val & 0x10) << 4;
-		if (crtc(read_only))
-			break;
+	case 0x07:																						// Overflow register
 		crtc(overflow) = val;
-		if ((vga.crtc.overflow ^ val) & 0xd6)
-			VGA_StartResize();
-		/*
-			0  Bit 8 of Vertical Total (3d4h index 6)
-			1  Bit 8 of Vertical Display End (3d4h index 12h)
-			2  Bit 8 of Vertical Retrace Start (3d4h index 10h)
-			3  Bit 8 of Start Vertical Blanking (3d4h index 15h)
-			4  Bit 8 of Line Compare Register (3d4h index 18h)
-			5  Bit 9 of Vertical Total (3d4h index 6)
-			6  Bit 9 of Vertical Display End (3d4h index 12h)
-			7  Bit 9 of Vertical Retrace Start (3d4h index 10h)
-		*/
 		break;
-	case 0x08:		// Preset Row Scan Register
+	case 0x08:																						// Preset row scan register
 		crtc(preset_row_scan) = val;
-		vga.config.hlines_skip = val&31;
-		vga.config.bytes_skip = (val>>5)&3;
+//		vga.config.hlines_skip = val&31;
 		/*
 			0-4	Number of lines we have scrolled down in the first character row.
 				Provides Smooth Vertical Scrolling.b
@@ -107,10 +85,8 @@ void vga_write_p3d5(Bitu port, Bitu val, Bitu iolen)
 				(3C0h index 13h).
 		*/
 		break;
-	case 0x09:		// Maximum Scan Line Register
+	case 0x09:																						// Maximum scan line register
 		{
-		vga.config.line_compare &= 0x5ff;
-		vga.config.line_compare |= (val&0x40)<<3;
 		Bit8u old = crtc(maximum_scan_line);
 		crtc(maximum_scan_line) = val;
 
@@ -136,7 +112,7 @@ void vga_write_p3d5(Bitu port, Bitu val, Bitu iolen)
 		*/
 		break;
 		}
-	case 0x0A:		// Cursor Start Register
+	case 0x0A:																						// Cursor start register
 		crtc(cursor_start) = val;
 		vga.draw.cursor.sline = val&0x1f;
 		vga.draw.cursor.enabled = !(val&0x20);
@@ -145,7 +121,7 @@ void vga_write_p3d5(Bitu port, Bitu val, Bitu iolen)
 			5	Turns Cursor off if set
 		*/
 		break;
-	case 0x0B:		// Cursor End Register
+	case 0x0B:																						// Cursor end register
 		crtc(cursor_end) = val;
 		vga.draw.cursor.eline = val&0x1f;
 		vga.draw.cursor.delay = (val>>5)&0x3;
@@ -154,26 +130,26 @@ void vga_write_p3d5(Bitu port, Bitu val, Bitu iolen)
 			5-6	Delay of cursor data in character clocks.
 		*/
 		break;
-	case 0x0C:		// Start Address High Register
+	case 0x0C:																						// Start address high register
 		crtc(start_address_high) = val;
-		vga.config.display_start = (vga.config.display_start & 0xFF00FF)| (val << 8);	// 0-7  Upper 8 bits of the start address of the display buffer
+		vga.config.display_start = (vga.config.display_start & 0xFF00FF)| (val << 8);				// 0-7  upper 8 bits of the start address of the display buffer
 		break;
-	case 0x0D:		// Start Address Low Register
+	case 0x0D:																						// Start address low register
 		crtc(start_address_low) = val;
-		vga.config.display_start = (vga.config.display_start & 0xFFFF00)| val;			// 0-7	Lower 8 bits of the start address of the display buffer
+		vga.config.display_start = (vga.config.display_start & 0xFFFF00)| val;						// 0-7	lower 8 bits of the start address of the display buffer
 		break;
-	case 0x0E:		// Cursor Location High Register
+	case 0x0E:																						// Cursor location high register
 		crtc(cursor_location_high) = val;
 		vga.config.cursor_start &= 0xff00ff;
-		vga.config.cursor_start |= val << 8;			//	0-7  Upper 8 bits of the address of the cursor
+		vga.config.cursor_start |= val << 8;														//	0-7  upper 8 bits of the address of the cursor
 		break;
-	case 0x0F:		// Cursor Location Low Register
+	case 0x0F:																						// Cursor location low register
 // TODO update cursor on screen
 		crtc(cursor_location_low) = val;
 		vga.config.cursor_start &= 0xffff00;
-		vga.config.cursor_start |= val;					//	0-7  Lower 8 bits of the address of the cursor
+		vga.config.cursor_start |= val;																//	0-7  lower 8 bits of the address of the cursor
 		break;
-	case 0x10:		// Vertical Retrace Start Register
+	case 0x10:																						// Vertical retrace startr register
 		crtc(vertical_retrace_start) = val;
 		/*	
 			0-7	Lower 8 bits of Vertical Retrace Start. Vertical Retrace starts when
@@ -181,11 +157,10 @@ void vga_write_p3d5(Bitu port, Bitu val, Bitu iolen)
 			bit 2. Bit 9 is found in 3d4h index 7 bit 7.
 		*/
 		break;
-	case 0x11:		// Vertical Retrace End Register
+	case 0x11:																						// Vertical retrace end register
 		crtc(vertical_retrace_end) = val;
 		if (!(val & 0x10))
 			vga.draw.vret_triggered = false;
-		crtc(read_only) = (val & 128) > 0;
 		/*
 			0-3	Vertical Retrace ends when the last 4 bits of the line counter equals
 				this value.
@@ -197,15 +172,13 @@ void vga_write_p3d5(Bitu port, Bitu val, Bitu iolen)
 				affected by this bit.
 		*/
 		break;
-	case 0x12:		// Vertical Display End Register
+	case 0x12:																						// Vertical display end register
 		if (val != crtc(vertical_display_end))
 			{
 			if (abs((Bits)val-(Bits)crtc(vertical_display_end)) < 3)
 				{
-				// delay small vde changes a bit to avoid screen resizing
-				// if they are reverted in a short timeframe
-				PIC_RemoveEvents(VGA_SetupDrawing);
-				vga.draw.resizing = false;
+				PIC_RemoveEvents(VGA_SetupDrawing);													// Delay small vde changes a bit to avoid screen resizing
+				vga.draw.resizing = false;															// if they are reverted in a short timeframe
 				crtc(vertical_display_end) = val;
 				VGA_StartResize(150);
 				}
@@ -221,7 +194,7 @@ void vga_write_p3d5(Bitu port, Bitu val, Bitu iolen)
 			Bit 9 is found in 3d4h index 7 bit 6.
 		*/
 		break;
-	case 0x13:		// Offset register
+	case 0x13:																						// Offset register
 		crtc(offset) = val;
 		vga.config.scan_len &= 0x300;
 		vga.config.scan_len |= val;
@@ -231,7 +204,7 @@ void vga_write_p3d5(Bitu port, Bitu val, Bitu iolen)
 				word mode and 8 for Double Word mode.
 		*/
 		break;
-	case 0x14:		// Underline Location Register
+	case 0x14:																						// Underline location register
 		crtc(underline_location) = val;
 		// Byte,word,dword mode
 		/*
@@ -240,31 +213,13 @@ void vga_write_p3d5(Bitu port, Bitu val, Bitu iolen)
 			6	Double Word mode addressing if set
 		*/
 		break;
-	case 0x15:		// Start Vertical Blank Register
-		if (val != crtc(start_vertical_blanking))
-			{
-			crtc(start_vertical_blanking) = val;
-			VGA_StartResize();
-			}
-		/* 
-			0-7	Lower 8 bits of Vertical Blank Start. Vertical blanking starts when
-				the line counter reaches this value. Bit 8 is found in 3d4h index 7
-				bit 3.
-		*/
+	case 0x15:																						// Start vertical blank register
+		crtc(start_vertical_blanking) = val;
 		break;
-	case 0x16:		//  End Vertical Blank Register
-		if (val != crtc(end_vertical_blanking))
-			{
-			crtc(end_vertical_blanking) = val;
-			VGA_StartResize();
-			}
-		/*
-			0-6	Vertical blanking stops when the lower 7 bits of the line counter
-				equals this field. Some SVGA chips uses all 8 bits!
-				IBM actually says bits 0-7.
-		*/
+	case 0x16:																						// End vertical blank register
+		crtc(end_vertical_blanking) = val;
 		break;
-	case 0x17:		// Mode Control Register
+	case 0x17:																						// Mode control register
 		crtc(mode_control) = val;
 		// Byte,word,dword mode
 		// Should we really need to do a determinemode here?
@@ -285,15 +240,8 @@ void vga_write_p3d5(Bitu port, Bitu val, Bitu iolen)
 			7	Clearing this bit will reset the display system until the bit is set again.
 		*/
 		break;
-	case 0x18:		// Line Compare Register
+	case 0x18:																						// Line compare register
 		crtc(line_compare) = val;
-		vga.config.line_compare = (vga.config.line_compare & 0x700) | val;
-		/*
-			0-7	Lower 8 bits of the Line Compare. When the Line counter reaches this
-				value, the display address wraps to 0. Provides Split Screen
-				facilities. Bit 8 is found in 3d4h index 7 bit 4.
-				Bit 9 is found in 3d4h index 9 bit 6.
-		*/
 		break;
 		}
 	}
@@ -309,61 +257,57 @@ Bitu vga_read_p3d5x(Bitu port, Bitu iolen)
 	{
 	switch (crtc(index))
 		{
-	case 0x00:		// Horizontal Total Register
+	case 0x00:																						// Horizontal total register
 		return crtc(horizontal_total);
-	case 0x01:		// Horizontal Display End Register
+	case 0x01:																						// Horizontal Display End Register
 		return crtc(horizontal_display_end);
-	case 0x02:		// Start Horizontal Blanking Register
+	case 0x02:																						// Start Horizontal Blanking Register
 		return crtc(start_horizontal_blanking);
-	case 0x03:		// End Horizontal Blanking Register
+	case 0x03:																						// End Horizontal Blanking Register
 		return crtc(end_horizontal_blanking);
-	case 0x04:		// Start Horizontal Retrace Register
+	case 0x04:																						// Start Horizontal Retrace Register
 		return crtc(start_horizontal_retrace);
-	case 0x05:		// End Horizontal Retrace Register
+	case 0x05:																						// End Horizontal Retrace Register
 		return crtc(end_horizontal_retrace);
-	case 0x06:		// Vertical Total Register
+	case 0x06:																						// Vertical Total Register
 		return crtc(vertical_total);	
-	case 0x07:		// Overflow Register
+	case 0x07:																						// Overflow Register
 		return crtc(overflow);
-	case 0x08:		// Preset Row Scan Register
+	case 0x08:																						// Preset Row Scan Register
 		return crtc(preset_row_scan);
-	case 0x09:		// Maximum Scan Line Register
+	case 0x09:																						// Maximum Scan Line Register
 		return crtc(maximum_scan_line);
-	case 0x0A:		// Cursor Start Register
+	case 0x0A:																						// Cursor Start Register
 		return crtc(cursor_start);
-	case 0x0B:		// Cursor End Register
+	case 0x0B:																						// Cursor End Register
 		return crtc(cursor_end);
-	case 0x0C:		// Start Address High Register
+	case 0x0C:																						// Start Address High Register
 		return crtc(start_address_high);
-	case 0x0D:		// Start Address Low Register
+	case 0x0D:																						// Start Address Low Register
 		return crtc(start_address_low);
-	case 0x0E:		// Cursor Location High Register
+	case 0x0E:																						// Cursor Location High Register
 		return crtc(cursor_location_high);
-	case 0x0F:		// Cursor Location Low Register
+	case 0x0F:																						// Cursor Location Low Register
 		return crtc(cursor_location_low);
-	case 0x10:		// Vertical Retrace Start Register
+	case 0x10:																						// Vertical Retrace Start Register
 		return crtc(vertical_retrace_start);
-	case 0x11:		// Vertical Retrace End Register
+	case 0x11:																						// Vertical Retrace End Register
 		return crtc(vertical_retrace_end);
-	case 0x12:		// Vertical Display End Register
+	case 0x12:																						// Vertical Display End Register
 		return crtc(vertical_display_end);
-	case 0x13:		// Offset register
+	case 0x13:																						// Offset register
 		return crtc(offset);
-	case 0x14:		// Underline Location Register
+	case 0x14:																						// Underline Location Register
 		return crtc(underline_location);
-	case 0x15:		// Start Vertical Blank Register
+	case 0x15:																						// Start Vertical Blank Register
 		return crtc(start_vertical_blanking);
-	case 0x16:		//  End Vertical Blank Register
+	case 0x16:																						// End Vertical Blank Register
 		return crtc(end_vertical_blanking);
-	case 0x17:		// Mode Control Register
+	case 0x17:																						// Mode Control Register
 		return crtc(mode_control);
-	case 0x18:		// Line Compare Register
+	case 0x18:																						// Line Compare Register
 		return crtc(line_compare);
 	default:
 		return 0;
 		}
 	}
-
-
-
-

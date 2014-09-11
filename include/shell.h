@@ -14,6 +14,7 @@
 
 #define CMD_MAXLINE 4096
 extern Bitu call_shellstop;
+extern bool LoadHigh;
 
 class DOS_Shell;
 
@@ -52,10 +53,9 @@ public:
 	void ShowPrompt();
 	void DoCommand(char * cmd);
 	bool Execute(char * name,char * args);
-// Orginally external commands
+// Some supported commands
 	void CMD_MEM(char * args);
 	void CMD_USE(char * args);
-// Some supported commands
 	void CMD_CALL(char * args);
 	void CMD_CHDIR(char * args);
 	void CMD_CLS(char * args);

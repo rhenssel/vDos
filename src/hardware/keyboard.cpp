@@ -1,9 +1,8 @@
 #include "vDos.h"
 #include "inout.h"
 #include "pic.h"
-#include "mem.h"
 #include "timer.h"
-#include "control.h"
+#include <math.h>
 
 
 enum KeyCommands {
@@ -22,8 +21,6 @@ static Bitu read_p60(Bitu port, Bitu iolen)
 
 static void write_p60(Bitu port, Bitu val, Bitu iolen)
 	{
-	if (command == CMD_SETOUTPORT)
-		MEM_A20_Enable((val & 2)>0);
 	command = CMD_NONE;
 	}
 
@@ -56,7 +53,7 @@ static Bitu read_p64(Bitu port, Bitu iolen)
 	return 0x1c;
 	}
 
-void KEYBOARD_Init(Section* sec)
+void KEYBOARD_Init()
 	{
 	IO_RegisterWriteHandler(0x60, write_p60, IO_MB);
 	IO_RegisterReadHandler(0x60, read_p60, IO_MB);

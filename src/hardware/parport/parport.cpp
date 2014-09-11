@@ -1,4 +1,3 @@
-#include <string.h>
 #include "vDos.h"
 #include "bios.h"					// SetLPTPort(..)
 
@@ -121,32 +120,15 @@ void CParallel::initialize()
 CParallel* parallelPorts[3] = {0, 0, 0};
 static device_PRT* dosdevices[9];
 
-void PARALLEL_Destroy (Section * sec)
+void PARALLEL_Init ()
 	{
-	for (Bitu i = 0; i < 9; i++)
-		{
-		if (i < 3 && parallelPorts[i])
-			{
-			delete parallelPorts[i];
-			parallelPorts[i] = 0;
-			}
-		if (dosdevices[i])
-			{
-			DOS_DelDevice(dosdevices[i]);
-			dosdevices[i] = 0;
-			}
-		}
-	}
-
-void PARALLEL_Init (Section * sec)
-	{
-	Section_prop *section = static_cast <Section_prop*>(sec);
+//	Section_prop *section = static_cast <Section_prop*>(sec);
 	char pname[] = "LPTx";
 	// iterate through first 3 lpt ports and the rest (LPT4-9)
 	for (Bitu i = 0; i < 9; i++)
 		{
 		pname[3] = '1' + i;
-		dosdevices[i] = new device_PRT(pname, section->Get_string(pname));
+		dosdevices[i] = new device_PRT(pname, ConfGetString(pname));
 		DOS_AddDevice(dosdevices[i]);
 		if (i < 3)
 			parallelPorts[i] = new CParallel(i, dosdevices[i]);

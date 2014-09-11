@@ -14,7 +14,7 @@
 // CPU Cycle Timing
 extern Bit32s CPU_Cycles;
 extern Bit32s CPU_CycleLeft;
-extern Bit32s CPU_CycleMax;
+//extern Bit32s CPU_CycleMax;
 
 // Some common Defines
 // A CPU Handler
@@ -23,6 +23,7 @@ extern CPU_Decoder * cpudecoder;
 
 Bits CPU_Core_Normal_Run(void);
 Bits CPU_Core_Normal_Trap_Run(void);
+Bits PageFaultCore(void);
 
 // CPU Stuff
 extern Bit16u parity_lookup[256];
@@ -83,17 +84,17 @@ void CPU_ENTER(bool use32,Bitu bytes,Bitu level);
 
 void CPU_Interrupt(Bitu num,Bitu type, Bitu oldeip);
 
-static INLINE void CPU_HW_Interrupt(Bitu num)
+static inline void CPU_HW_Interrupt(Bitu num)
 	{
 	CPU_Interrupt(num, 0, reg_eip);
 	}
 
-static INLINE void CPU_SW_Interrupt(Bitu num, Bitu oldeip)
+static inline void CPU_SW_Interrupt(Bitu num, Bitu oldeip)
 	{
 	CPU_Interrupt(num, CPU_INT_SOFTWARE, oldeip);
 	}
 
-static INLINE void CPU_SW_Interrupt_NoIOPLCheck(Bitu num, Bitu oldeip)
+static inline void CPU_SW_Interrupt_NoIOPLCheck(Bitu num, Bitu oldeip)
 	{
 	CPU_Interrupt(num,CPU_INT_SOFTWARE|CPU_INT_NOIOPLCHECK, oldeip);
 	}

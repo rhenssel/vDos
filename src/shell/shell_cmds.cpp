@@ -5,10 +5,6 @@
 #include "../dos/drives.h"
 #include "../src/ints/int10.h"
 #include "support.h"
-#include "control.h"
-#include <cstring>
-#include <cctype>
-#include <cstdlib>
 #include <vector>
 #include <string>
 #include <time.h>
@@ -53,16 +49,7 @@ static SHELL_Cmd cmd_list[]={
 }; 
 
 bool do_break = false;
-
-/* support functions */
-static char empty_char = 0;
-static char* empty_string = &empty_char;
-
-static void StripSpaces(char*&args)
-	{
-	while (isspace(*args))
-		args++;
-	}
+bool LoadHigh = false;
 
 static void StripSpaces(char*&args, char also)
 	{
@@ -84,16 +71,15 @@ static char* ExpandDot(char* args, char* buffer)
 
 void DOS_Shell::DoCommand(char * line)
 	{
-	// Parse the line first for % stuff
 	char * cmdOrg = line;
 	char cmdNew[CMD_MAXLINE];
 	char *cmdPtr = cmdNew;
-	while (*cmdOrg)
+	while (*cmdOrg)													// Parse the line first for % stuff
 		{
 		if (*cmdOrg == '%')
 			{
 			char nextChar = *(++cmdOrg);
-			if (nextChar == '%' || (!bf && nextChar >= '0'&& nextChar <= '9'))	// Skip %% and %0-%9 if not in batchfile
+			if (nextChar == '%' || (!bf && nextChar >= '0' && nextChar <= '9'))	// Skip %% and %0-%9 if not in batchfile
 				*cmdPtr++ = '%';
 			else if (nextChar == '0')								// Handle %0
 				{
@@ -103,12 +89,10 @@ void DOS_Shell::DoCommand(char * line)
 				}
 			else if (nextChar > '0' && nextChar <= '9')				// Handle %1..%9
 				{  
-				strcpy(cmdPtr, bf->cmd->FindCommand(nextChar-'0'));
+				cmdOrg++;
+				strcpy(cmdPtr, bf->cmd->GetVarNum(nextChar-'0'));
 				if (*cmdPtr)										// If substituted
-					{
-					cmdOrg++;
 					cmdPtr += strlen(cmdPtr);
-					}
 				}
 			else													// Not a command line number has to be an environment string
 				{
@@ -148,21 +132,20 @@ void DOS_Shell::DoCommand(char * line)
 		}
 	*cmdPtr = 0;
 
-	// Next split the line into command and arguments
-	line = trim(cmdNew);
+	line = lrTrim(cmdNew);
 	char cmdBuff[CMD_MAXLINE];
 	char * cmd_write = cmdBuff;
-	while (*line)
+	while (*line)													// Next split the line into command and arguments
 		{
 		if (*line == 32 || *line == '/' || *line == '\t' || *line == '=')
 			break;
-		if (*line == '.' || *line == '\\')											// allow stuff like cd.. and dir.exe cd\kees
+		if (*line == '.' || *line == '\\')							// Allow stuff like cd.. and dir.exe cd\kees
 			{
 			*cmd_write = 0;
 			for (Bit32u cmd_index = 0; cmd_list[cmd_index].name; cmd_index++)
 				if (stricmp(cmd_list[cmd_index].name, cmdBuff) == 0)
 					{
-					(this->*(cmd_list[cmd_index].handler))(ltrim(line));
+					(this->*(cmd_list[cmd_index].handler))(lTrim(line));
 			 		return;
 					}
 			}
@@ -171,37 +154,33 @@ void DOS_Shell::DoCommand(char * line)
 	*cmd_write = 0;
 	if (*cmdBuff == 0)
 		return;
-	
-	for (Bit32u cmd_index = 0; cmd_list[cmd_index].name; cmd_index++)				// Check the internal list
-		if (stricmp(cmd_list[cmd_index].name, cmdBuff) == 0)
-			{
-			(this->*(cmd_list[cmd_index].handler))(ltrim(line));
-	 		return;
-			}
 
-	if (cmdBuff[1] == ':')					// drive specifified?
+	if (!LoadHigh)													// If not called from Loadhigh, check the internal commands
+		for (int cmd_index = 0; cmd_list[cmd_index].name; cmd_index++)
+			if (stricmp(cmd_list[cmd_index].name, cmdBuff) == 0)
+				{
+				(this->*(cmd_list[cmd_index].handler))(lTrim(line));
+	 			return;
+				}
+	if (cmdBuff[1] == ':')											// Drive specifified?
 		{	
 		if (!isalpha(*cmdBuff) || !DOS_DriveIsMounted(toupper(*cmdBuff) -'A'))
 			{
 			WriteOut(MSG_Get("INVALID_DRIVE"));
 			return;
 			}
-		// check for a drive change (A-Z: or A-Z:\)
+		// Check for a drive change (A-Z: or A-Z:\)
 		if ((cmdBuff[2] == 0) || (strspn(cmdBuff+2, "\\") == strlen(cmdBuff)-2))	// DOS treates multiple \'s as single '\', args are ignored, so OK
 			{
 			DOS_SetDefaultDrive(toupper(*cmdBuff)-'A');
 			return;
 			}
 		}
-	if (!Execute(cmdBuff, ltrim(line)))												// It isn't an internal command execute it
+	if (!Execute(cmdBuff, lTrim(line)))								// It isn't an internal command execute it
 		WriteOut(MSG_Get("ILLEGAL_COMMAND"));
 	}
 
-#define HELP(command) \
-	if (strstr(args, "/?")) { \
-		WriteOut(MSG_Get(command "?")); \
-		return; \
-	}
+#define HELP(command) if (strstr(args, "/?")) {	WriteOut(MSG_Get(command "?")); return; }
 
 void DOS_Shell::CMD_MEM(char * args)
 	{
@@ -211,31 +190,29 @@ void DOS_Shell::CMD_MEM(char * args)
 		WriteOut(MSG_Get("INVALID_PARAMETER"), args);
 		return;
 		}
-
-	// Show conventional Memory
-	Bit16u segment;
+	WriteOut(MSG_Get("MEM:INTRO"));
+	Bit16u segment;													// Show free conventional memory
 	Bit16u total = 0xffff;
 	DOS_AllocateMemory(&segment, &total);
 	WriteOut(MSG_Get("MEM:CONVEN"), total*16/1024);
 
-	// show upper memory
-	Bit16u largest, count;
+	Bit16u largest, count;											// Show free upper memory
 	if (DOS_GetFreeUMB(&total, &largest, &count))
 		if (count == 1)
-			WriteOut(MSG_Get("MEM:UPPER1"), total*16/1024);
+			WriteOut(MSG_Get("MEM:UPPER1"), (total*16+112)/1024);	// Round numebers
 		else
-			WriteOut(MSG_Get("MEM:UPPER2"), total*16/1024, count, largest*16/1024);
-
-	// Show free XMS
-	Bit16u largestFree, totalFree;
-	if (!XMS_QueryFreeMemory(largestFree, totalFree))
-		WriteOut(MSG_Get("MEM:EXTEND"), totalFree);
+			WriteOut(MSG_Get("MEM:UPPER2"), (total*16+112)/1024, count, (largest*16+112)/1024);
+	if (!XMS_QueryFreeMemory(largest))								// Show free XMS
+		WriteOut(MSG_Get("MEM:XMS"), largest);
+	largest = EMS_FreeKBs();										// Show free EMS
+	if (largest)
+		WriteOut(MSG_Get("MEM:EMS"), largest);
 	}
 
 void DOS_Shell::CMD_USE(char *args)
 	{
 	HELP("USE");
-	if (!*args)						// If no arguments show active assignments
+	if (!*args)														// If no arguments show active assignments
 		{
 		WriteOut(MSG_Get("USE:MOUNTED"));
 		for (int d = 0; d < DOS_DRIVES - 1; d++)
@@ -244,7 +221,6 @@ void DOS_Shell::CMD_USE(char *args)
 		WriteOut("Z: %s\n", Drives[25]->GetInfo());
 		return;
 		}
-
 	if (strlen(args) < 2 || !isalpha(*args) || args[1] != ':')
 		{
 		WriteOut(MSG_Get("INVALID_DRIVE"), args);
@@ -252,27 +228,29 @@ void DOS_Shell::CMD_USE(char *args)
 		}
 	char label[] = " _DRIVE";
 	label[0] = toupper(*args);
+	char* rem = lTrim(args+2);
+	if (!strlen(rem))
+		{
+		if (Drives[label[0]-'A'])
+			WriteOut("%c: => %s\n", label[0], Drives[label[0]-'A']->GetInfo());
+		else
+			WriteOut(MSG_Get("MISSING_PARAMETER"));
+		return;
+		}
 	if (Drives[label[0]-'A'])
 		{
 		WriteOut(MSG_Get("USE:ALREADY_USED"), label[0]);
 		return;
 		}
-
-	char* rem = ltrim(args+2);
-	if (!strlen(rem))
+	while (strlen(rem) > 1 && *rem == '"' && rem[strlen(rem)-1] == '"')	// Surrounding by "'s not needed/wanted
 		{
-		WriteOut(MSG_Get("MISSING_PARAMETER"));
-		return;
-		}
-	while (strlen(rem) > 1 && *rem == '"' && rem[strlen(rem)-1] == '"')			// surrounding by "'s not needed/wanted
-		{
-		rem[strlen(rem)-1] = 0;													// remove them, eventually '\\' is appended
+		rem[strlen(rem)-1] = 0;										// Remove them, eventually '\\' is appended
 		rem++;
 		}
 
-	char pathBuf[512];															// 512-1 should do!
-	pathBuf[0] = 0;																// For eventual error message to test if used
-	int len = GetFullPathName(rem, 511, pathBuf, NULL);							// optional lpFilePath is of no use
+	char pathBuf[512];												// 512-1 should do!
+	pathBuf[0] = 0;													// For eventual error message to test if used
+	int len = GetFullPathName(rem, 511, pathBuf, NULL);				// Optional lpFilePath is of no use
 	if (len != 0 && len < 511)
 		{
 		int attr = GetFileAttributes(pathBuf);
@@ -281,8 +259,8 @@ void DOS_Shell::CMD_USE(char *args)
 			if (pathBuf[strlen(pathBuf)-1] != '\\')
 				strcat(pathBuf, "\\");
 
-			Bit8u mediaid = 0xF8;												// Hard Disk
-			DOS_Drive *newdrive = new localDrive(pathBuf, 512, 127, 1230, 615, mediaid);	// 512*127*1230 == ~80 MB total size, *615  == ~40 MB free size
+			Bit8u mediaid = 0xF8;									// Hard Disk
+			DOS_Drive *newdrive = new localDrive(pathBuf, 512, 127, 1290, 1128, mediaid);	// 512*127*1290 == ~80 MB total size, *1139  == ~70 MB free size
 			if (!newdrive)
 				{
 				WriteOut(MSG_Get("USE:ERROR"), label[0], pathBuf);
@@ -322,29 +300,27 @@ void DOS_Shell::CMD_DELETE(char * args)
 		WriteOut(MSG_Get("INVALID_SWITCH"), rem);
 		return;
 		}
-	//	Command uses dta so set it to our internal dta
-	RealPt save_dta = dos.dta();
+	RealPt save_dta = dos.dta();									//	Command uses dta so set it to our internal dta
 	dos.dta(dos.tables.tempdta);
 
 	char full[DOS_PATHLENGTH];
 	char buffer[MAX_PATH_LEN];
 	args = ExpandDot(args, buffer);
-	StripSpaces(args);
+	lTrim(args);
 	if (!DOS_Canonicalize(args, full))
 		{
 		WriteOut(MSG_Get("ILLEGAL_PATH"));
 		return;
 		}
-// TODO Maybe support confirmation for *.* like dos does.	
-	bool res = DOS_FindFirst(args, 0xffff & ~DOS_ATTR_VOLUME);
+	bool res = DOS_FindFirst(args, 0xffff & ~DOS_ATTR_VOLUME);		// TODO Maybe support confirmation for *.* like DOS does
 	if (!res)
 		{
 		WriteOut(MSG_Get("DEL:ERROR"),args);
 		dos.dta(save_dta);
 		return;
 		}
-	// end can't be 0, but if it is we'll get a nice crash, who cares :)
-	char * end = strrchr(full,'\\')+1;
+
+	char * end = strrchr(full,'\\')+1;								// End can't be 0, but if it is we'll get a nice crash, who cares :)
 	*end = 0;
 	char name[DOS_NAMELENGTH_ASCII];
 	Bit32u size;
@@ -384,21 +360,15 @@ void DOS_Shell::CMD_RENAME(char * args)
 	if (slash)
 		{ 
 		slash++;
-		/* If directory specified (crystal caves installer)
-		 * rename from c:\X : rename c:\abc.exe abc.shr. 
-		 * File must appear in C:\ */ 
-		
 		char dir_source[DOS_PATHLENGTH] = {0};
-		//Copy first and then modify, makes GCC happy
 		strcpy(dir_source, arg1);
 		char* dummy = strrchr(dir_source, '\\');
 		*dummy = 0;
-
 		if ((strlen(dir_source) == 2) && (dir_source[1] == ':')) 
-			strcat(dir_source,"\\"); // X: add slash
+			strcat(dir_source,"\\");								// X: add slash
 
 		char dir_current[DOS_PATHLENGTH + 1];
-		dir_current[0] = '\\';	//Absolute addressing so we can return properly
+		dir_current[0] = '\\';										// Absolute addressing so we can return properly
 		DOS_GetCurrentDir(0, dir_current + 1);
 		if(!DOS_ChangeDir(dir_source))
 			{
@@ -440,7 +410,6 @@ void DOS_Shell::CMD_ECHO(char * args)
 		echo = true;		
 		return;
 		}
-
 	if (*args == '.' || *args=='/')
 		args++;
 	WriteOut("%s\r\n", args);
@@ -518,15 +487,14 @@ void DOS_Shell::CMD_RMDIR(char * args)
 
 char *commaprint(Bitu n)
 	{
-	static char comma = 0;
 	static char retbuf[30];
-
-	if (comma == 0)
-		{
-		struct lconv *lcp = localeconv();
-		comma = *lcp->thousands_sep != 0 ? *lcp->thousands_sep : ',';		// ATTENTION: it's always 0, why????
-		}
-
+//	static char comma = 0;
+//	if (comma == 0)
+//		{
+//		struct lconv *lcp = localeconv();
+//		comma = *(lcp->mon_thousands_sep) != 0 ? *(lcp->mon_thousands_sep) : ',';	// ATTENTION: it's always 0, why????
+//		}
+	static char comma = ',';
 	char *p = &retbuf[sizeof(retbuf)-1];
 	*p = '\0';
 	int i = 0;
@@ -539,16 +507,13 @@ char *commaprint(Bitu n)
 		i++;
 		}
 	while(n != 0);
-
 	return p;
 	}
 
-void DOS_Shell::CMD_DIR(char * args)		// TODO: disgard files size >= 1GB
+void DOS_Shell::CMD_DIR(char * args)								// TODO: disgard files size >= 1GB ?
 	{
 	HELP("DIR");
-
 	char path[DOS_PATHLENGTH];
-
 	if (char * found = GetEnvStr("DIRCMD"))
 		{
 		std::string line = args;
@@ -575,34 +540,32 @@ void DOS_Shell::CMD_DIR(char * args)		// TODO: disgard files size >= 1GB
 	byte_count = file_count = dir_count = 0;
 
 	char buffer[MAX_PATH_LEN];
-	args = trim(args);
+	args = lrTrim(args);
 	size_t argLen = strlen(args);
 	if (argLen == 0)
-		strcpy(args, "*.*");								// no arguments.
+		strcpy(args, "*.*");										// No arguments.
 	else if (args[argLen-1] == '\\' || args[argLen-1] == ':')
-		strcat(args, "*.*");								// handle \, C:\, C: etc.
+		strcat(args, "*.*");										// Handle \, C:\, C: etc.
 	args = ExpandDot(args, buffer);
 
 	if (!strrchr(args,'*') && !strrchr(args,'?'))
 		{
 		Bit16u attribute = 0;
 		if (DOS_GetFileAttr(args, &attribute) && (attribute&DOS_ATTR_DIRECTORY))
-			strcat(args,"\\*.*");							// if no wildcard and a directory, get its files
+			strcat(args,"\\*.*");									// If no wildcard and a directory, get its files
 		}
 	if (!strrchr(args,'.'))
-		strcat(args,".*");									// if no extension, get them all
-
-	// Make a full path in the args
-	if (!DOS_Canonicalize(args, path))
+		strcat(args,".*");											// If no extension, get them all
+	if (!DOS_Canonicalize(args, path))								// Make a full path in the args
 		{
 		WriteOut(MSG_Get("ILLEGAL_PATH"));
 		return;
 		}
 	*(strrchr(path, '\\')+1) = 0;
-	if (strlen(path) > 3)									// remove trailling '\\' from subdirs
+	if (strlen(path) > 3)											// Remove trailling '\\' from subdirs
 		path[strlen(path)-1] = 0;
-	// Command uses dta so set it to our internal dta
-	RealPt save_dta = dos.dta();
+	
+	RealPt save_dta = dos.dta();									// Command uses dta so set it to our internal dta
 	dos.dta(dos.tables.tempdta);
 	DOS_DTA dta(dos.dta());
 	bool ret = DOS_FindFirst(args, 0xffff & ~DOS_ATTR_VOLUME & ~DOS_ATTR_DEVICE);
@@ -622,31 +585,28 @@ void DOS_Shell::CMD_DIR(char * args)		// TODO: disgard files size >= 1GB
  
 	do_break = false;
 	do
-		{	// File name and extension
-		char name[DOS_NAMELENGTH_ASCII];
+		{
+		char name[DOS_NAMELENGTH_ASCII];							// File name and extension
 		Bit32u size;
 		Bit16u date;
 		Bit16u time;
 		Bit8u attr;
 		dta.GetResult(name, size, date, time,attr);
-
-		if (optAD && !(attr & DOS_ATTR_DIRECTORY))			// Skip non-directories if option AD is present
+		if (optAD && !(attr & DOS_ATTR_DIRECTORY))					// Skip non-directories if option AD is present
 			continue;
-
-		// output the file
-		if (optB)
+		if (optB)													// Output the file
 			{
-			if (strcmp(".", name) && strcmp("..", name))	// this overrides pretty much everything
+			if (strcmp(".", name) && strcmp("..", name))			// This overrides pretty much everything
 				WriteOut("%s\n", name);
 			}
 		else
 			{
-			char* ext = empty_string;
+			char* ext = "";
 			if (!optW && (name[0] != '.'))
 				{
 				ext = strrchr(name, '.');
 				if (!ext)
-					ext = empty_string;
+					ext = "";
 				else
 					*ext++ = 0;
 				}
@@ -668,7 +628,7 @@ void DOS_Shell::CMD_DIR(char * args)		// TODO: disgard files size >= 1GB
 							WriteOut(" ");
 					}
 				else
-					WriteOut("%-8s %-3s %-13s %02d-%02d-%02d  %2d:%02d\n", name,ext, "<DIR>", day, month, year%100, hour, minute);
+					WriteOut("%-8s %-3s %-13s %02d-%02d-%02d  %2d:%02d\n", name, ext, "<DIR>", day, month, year%100, hour, minute);
 				dir_count++;
 				}
 			else
@@ -688,7 +648,7 @@ void DOS_Shell::CMD_DIR(char * args)		// TODO: disgard files size >= 1GB
 			}
 		if (optP && !(++p_count%((ttf.lins-3)*w_size)))
 			{
-			CMD_PAUSE(empty_string);
+			CMD_PAUSE("");
 			if (do_break)
 				return;
 			WriteOut(MSG_Get("DIR:CONTINUING"), path);
@@ -701,18 +661,14 @@ void DOS_Shell::CMD_DIR(char * args)		// TODO: disgard files size >= 1GB
 		WriteOut("\n");
 		if (optP && !(++p_count%((ttf.lins-3)*w_size)))
 			{
-			CMD_PAUSE(empty_string);
+			CMD_PAUSE("");
 			if (do_break)
 				return;
 			WriteOut(MSG_Get("DIR:CONTINUING"), path);
 			}
 		}
-	if (!optB)
-		{
-		// Show the summary of results
+	if (!optB)														// Show the summary of results, no freepsace shown, would just be a fake
 		WriteOut(MSG_Get("DIR:BYTES_USED"), file_count + dir_count, commaprint(byte_count));
-		// No freepsace shown, would just be a fake
-		}
 	dos.dta(save_dta);
 	}
 
@@ -729,8 +685,7 @@ void DOS_Shell::CMD_COPY(char * args)
 	{
 	HELP("COPY");
 	static char defaulttarget[] = ".";
-	// Command uses dta so set it to our internal dta
-	RealPt save_dta = dos.dta();
+	RealPt save_dta = dos.dta();									// Command uses dta so set it to our internal dta
 	dos.dta(dos.tables.tempdta);
 	DOS_DTA dta(dos.dta());
 	Bit32u size;
@@ -739,8 +694,7 @@ void DOS_Shell::CMD_COPY(char * args)
 	Bit8u attr;
 	char name[DOS_NAMELENGTH_ASCII];
 	std::vector<copysource> sources;
-	// ignore /a and /b switches: always copy binary
-	while (ScanCMDBool(args, "B")) ;
+	while (ScanCMDBool(args, "B")) ;								// Ignore /a and /b switches: always copy binary
 	while (ScanCMDBool(args, "A")) ;
 	ScanCMDBool(args, "Y");
 	ScanCMDBool(args, "-Y");
@@ -782,8 +736,7 @@ void DOS_Shell::CMD_COPY(char * args)
 			}
 		while(source_p && *source_p);
 		}
-	// At least one source has to be there
-	if (!sources.size() || !sources[0].filename.size())
+	if (!sources.size() || !sources[0].filename.size())				// At least one source has to be there
 		{
 		WriteOut(MSG_Get("MISSING_PARAMETER"));
 		dos.dta(save_dta);
@@ -798,8 +751,7 @@ void DOS_Shell::CMD_COPY(char * args)
 		target = sources.back();
 		sources.pop_back();
 		}
-	// If no target => default target with concat flag true to detect a+b+c
-	if (target.filename.size() == 0)
+	if (target.filename.size() == 0)								// If no target => default target with concat flag true to detect a+b+c
 		target = copysource(defaulttarget, true);
 
 	copysource oldsource;
@@ -807,33 +759,26 @@ void DOS_Shell::CMD_COPY(char * args)
 	Bit32u count = 0;
 	while (sources.size())
 		{
-		// Get next source item and keep track of old source for concat start end
-		oldsource = source;
+		oldsource = source;											// Get next source item and keep track of old source for concat start end
 		source = sources[0];
 		sources.erase(sources.begin());
-
-		// Skip first file if doing a+b+c. Set target to first file
-		if (!oldsource.concat && source.concat && target.concat)
+		if (!oldsource.concat && source.concat && target.concat)	// Skip first file if doing a+b+c. Set target to first file
 			{
 			target = source;
 			continue;
 			}
 
-		// Make a full path in the args
-		char pathSource[DOS_PATHLENGTH];
+		char pathSource[DOS_PATHLENGTH];							// Make a full path in the args
 		char pathTarget[DOS_PATHLENGTH];
-
 		if (!DOS_Canonicalize(const_cast<char*>(source.filename.c_str()), pathSource))
 			{
 			WriteOut(MSG_Get("ILLEGAL_PATH"));
 			dos.dta(save_dta);
 			return;
 			}
-		// cut search pattern
-		char* pos = strrchr(pathSource, '\\');
+		char* pos = strrchr(pathSource, '\\');						// Cut search pattern
 		if (pos)
 			*(pos+1) = 0;
-
 		if (!DOS_Canonicalize(const_cast<char*>(target.filename.c_str()), pathTarget))
 			{
 			WriteOut(MSG_Get("ILLEGAL_PATH"));
@@ -842,10 +787,8 @@ void DOS_Shell::CMD_COPY(char * args)
 			}
 		char* temp = strstr(pathTarget, "*.*");
 		if (temp)
-			*temp = 0;	//strip off *.* from target
-	
-		// add '\\' if target is a directoy
-		if (pathTarget[strlen(pathTarget)-1] != '\\')
+			*temp = 0;												// Strip *.* from target
+		if (pathTarget[strlen(pathTarget)-1] != '\\')				// Add '\\' if target is a directoy
 			if (DOS_FindFirst(pathTarget, 0xffff & ~DOS_ATTR_VOLUME))
 				{
 				dta.GetResult(name, size, date, time,attr);
@@ -853,19 +796,16 @@ void DOS_Shell::CMD_COPY(char * args)
 					strcat(pathTarget, "\\");
 				}
 
-		// Find first sourcefile
-		bool ret = DOS_FindFirst(const_cast<char*>(source.filename.c_str()), 0xffff & ~DOS_ATTR_VOLUME);
+		bool ret = DOS_FindFirst(const_cast<char*>(source.filename.c_str()), 0xffff & ~DOS_ATTR_VOLUME);	// Find first sourcefile
 		if (!ret)
 			{
 			WriteOut(MSG_Get("FILE_NOT_FOUND"));
 			dos.dta(save_dta);
 			return;
 			}
-
 		Bit16u sourceHandle, targetHandle;
 		char nameTarget[DOS_PATHLENGTH];
 		char nameSource[DOS_PATHLENGTH];
-
 		while (ret)
 			{
 			dta.GetResult(name, size, date, time,attr);
@@ -874,40 +814,33 @@ void DOS_Shell::CMD_COPY(char * args)
 				{
 				strcpy(nameSource, pathSource);
 				strcat(nameSource, name);
-				// Open Source
-				if (DOS_OpenFile(nameSource, 0, &sourceHandle))
+				if (DOS_OpenFile(nameSource, 0, &sourceHandle))			// Open Source
 					{
-					// Create Target or open it if in concat mode
-					strcpy(nameTarget, pathTarget);
+					strcpy(nameTarget, pathTarget);						// Create Target or open it if in concat mode
 					if (nameTarget[strlen(nameTarget)-1] == '\\')
 						strcat(nameTarget, name);
-					if (!count && !stricmp(nameSource, nameTarget))				// File cannot be copied nto itself
+					if (!count && !stricmp(nameSource, nameTarget))		// File cannot be copied nto itself
 						{
 						WriteOut(MSG_Get("COPY:SAMEFILE"));
 						dos.dta(save_dta);
 						return;
 						}
-
-					// Don't create a newfile when in concat mode
-					if (oldsource.concat || DOS_CreateFile(nameTarget, 0, &targetHandle))
+					if (oldsource.concat || DOS_CreateFile(nameTarget, 0, &targetHandle))	// Don't create a newfile when in concat mode
 						{
-						Bit32u dummy = 0;
-						// In concat mode. Open the target and seek to the eof
+						Bit32u dummy = 0;								// In concat mode. Open the target and seek to the eof
 						if (!oldsource.concat || (DOS_OpenFile(nameTarget, OPEN_READWRITE, &targetHandle) && DOS_SeekFile(targetHandle, &dummy, DOS_SEEK_END)))
 							{
-							// Copy 
-							static Bit8u buffer[0x8000];	// static, otherwise stack overflow possible.
-							Bit16u toread = 0x8000;
+							Bit16u toCopy = 0x8000;
 							do
 								{
-								DOS_ReadFile(sourceHandle, buffer, &toread);
-								DOS_WriteFile(targetHandle, buffer, &toread);
+								DOS_ReadFile(sourceHandle, tempBuff32K, &toCopy);
+								DOS_WriteFile(targetHandle, tempBuff32K, &toCopy);
 								}
-							while (toread == 0x8000);
+							while (toCopy == 0x8000);
 							DOS_CloseFile(sourceHandle);
 							DOS_CloseFile(targetHandle);
 							if (!source.concat)
-								count++;	// Only count concat files once
+								count++;								// Only count concat files once
 							}
 						else
 							{
@@ -924,11 +857,9 @@ void DOS_Shell::CMD_COPY(char * args)
 				else
 					WriteOut(MSG_Get("COPY:FAILURE"), const_cast<char*>(source.filename.c_str()));
 				}
-			// On the next file
-			ret = DOS_FindNext();
+			ret = DOS_FindNext();									// On to the next file
 			}
 		}
-
 	WriteOut(MSG_Get("COPY:SUCCESS"), count);
 	dos.dta(save_dta);
 	}
@@ -936,15 +867,13 @@ void DOS_Shell::CMD_COPY(char * args)
 void DOS_Shell::CMD_SET(char * args)
 	{
 	HELP("SET");
-
-	if (!*args)							// No command line show all environment lines
+	if (!*args)														// No command line show all environment lines
 		{
 		char * found;
 		for (Bitu a = 0; found = GetEnvNum(a) ; a++)
 			WriteOut("%s\n", found);			
 		return;
 		}
-
 	char * p = strpbrk(args, "=");
 	if (!p)
 		{
@@ -954,19 +883,17 @@ void DOS_Shell::CMD_SET(char * args)
 			WriteOut(MSG_Get("SET:NOT_SET"), args);
 		return;
 		}
-
 	*p++ = 0;
-	// parse p for envirionment variables
-	char parsed[CMD_MAXLINE];
+	char parsed[CMD_MAXLINE];										// Parse p for envirionment variables
 	char* p_parsed = parsed;
 	while (*p)
 		{
 		if (*p != '%')
-			*p_parsed++ = *p++;					// Just add it (most likely path)
+			*p_parsed++ = *p++;										// Just add it (most likely path)
 		else if (*(p+1) == '%')
 			{
 			*p_parsed++ = '%';
-			p += 2;								// %% => % 
+			p += 2;													// %% => % 
 			}
 		else
 			{
@@ -983,8 +910,7 @@ void DOS_Shell::CMD_SET(char * args)
 			}
 		}
 	*p_parsed = 0;
-	// Try setting the variable
-	if (!SetEnv(args, parsed))
+	if (!SetEnv(args, parsed))										// Try setting the variable
 		WriteOut(MSG_Get("SET:OUT_OF_SPACE"));
 	}
 
@@ -998,24 +924,20 @@ void DOS_Shell::CMD_IF(char * args)
 		{
 		if (!isspace(args[3]) && (args[3] != '='))
 			break;
-		args += 3;	// skip text
-		// skip more spaces
-		StripSpaces(args, '=');
+		args += 3;													// Skip text
+		StripSpaces(args, '=');										// Skip more spaces
 		has_not = true;
 		}
-
-	if (strncasecmp(args, "ERRORLEVEL", 10) == 0)
+	if (_strnicmp(args, "ERRORLEVEL", 10) == 0)
 		{
-		args += 10;		// skip text
-		// Strip spaces and ==
-		StripSpaces(args, '=');
+		args += 10;													// Skip text
+		StripSpaces(args, '=');										// Strip spaces and ==
 		char* word = StripWord(args);
 		if (!isdigit(*word))
 			{
 			WriteOut(MSG_Get("IF:ERRORLEVEL_MISSING"));
 			return;
 			}
-
 		Bit8u n = 0;
 		do
 			n = n * 10 + (*word - '0');
@@ -1025,25 +947,21 @@ void DOS_Shell::CMD_IF(char * args)
 			WriteOut(MSG_Get("IF:ERRORLEVEL_INVALID"));
 			return;
 			}
-		// Read the error code from DOS
-		if ((dos.return_code >= n) == (!has_not))
+		if ((dos.return_code >= n) == (!has_not))					// Read the error code from DOS
 			DoCommand(args);
 		return;
 		}
-
 	if (strnicmp(args,"EXIST ", 6) == 0)
 		{
-		args += 6;	// Skip text
-		StripSpaces(args);
+		args += 6;													// Skip text
+		lTrim(args);
 		char* word = StripWord(args);
 		if (!*word)
 			{
 			WriteOut(MSG_Get("IF:EXIST_NO_FILENAME"));
 			return;
 			}
-
-		// DOS_FindFirst uses dta so set it to our internal dta
-		RealPt save_dta = dos.dta();
+		RealPt save_dta = dos.dta();								// DOS_FindFirst uses dta so set it to our internal dta
 		dos.dta(dos.tables.tempdta);
 		bool ret = DOS_FindFirst(word, 0xffff & ~DOS_ATTR_VOLUME);
 		dos.dta(save_dta);
@@ -1052,18 +970,13 @@ void DOS_Shell::CMD_IF(char * args)
 		return;
 		}
 
-	// Normal if string compare
-	char* word1 = args;
-	// first word is until space or =
-	while (*args && !isspace(*args) && (*args != '='))
+	char* word1 = args;												// Normal if string compare
+	while (*args && !isspace(*args) && (*args != '='))				// First word is until space or =
 		args++;
 	char* end_word1 = args;
-
-	// scan for =
-	while (*args && (*args != '='))
+	while (*args && (*args != '='))									// Scan for =
 		args++;
-	// check for ==
-	if ((*args==0) || (args[1] != '='))
+	if ((*args==0) || (args[1] != '='))								// Check for ==
 		{
 		WriteOut(MSG_Get("SYNTAXERROR"));
 		return;
@@ -1072,16 +985,13 @@ void DOS_Shell::CMD_IF(char * args)
 	StripSpaces(args, '=');
 
 	char* word2 = args;
-	// second word is until space or =
-	while (*args && !isspace(*args) && (*args != '='))
+	while (*args && !isspace(*args) && (*args != '='))				// Second word is until space or =
 		args++;
-
 	if (*args)
 		{
-		*end_word1 = 0;		// mark end of first word
-		*args++ = 0;		// mark end of second word
+		*end_word1 = 0;												// Mark end of first word
+		*args++ = 0;												// Mark end of second word
 		StripSpaces(args, '=');
-
 		if ((strcmp(word1, word2) == 0) == (!has_not))
 			DoCommand(args);
 		}
@@ -1094,10 +1004,9 @@ void DOS_Shell::CMD_GOTO(char * args)
 		return;
 	if (*args && (*args==':'))
 		args++;
-	// label ends at the first space
 	char* non_space = args;
-	while (*non_space)
-		if ((*non_space == ' ') || (*non_space == '\t')) 
+	while (*non_space)												// Label ends at the first space
+		if (isspace(*non_space)) 
 			*non_space = 0; 
 		else
 			non_space++;
@@ -1129,13 +1038,13 @@ void DOS_Shell::CMD_TYPE(char * args)
 		return;
 		}
 	char * word;
-	if (word = ScanCMDRemain(args))			// no switches !!
+	if (word = ScanCMDRemain(args))									// No switches !!
 		{
 		WriteOut(MSG_Get("INVALID_SWITCH"), word);
 		return;
 		}
 	word = StripWord(args);
-	if (*args)								// only one parameter
+	if (*args)														// Only one parameter
 		{
 		WriteOut(MSG_Get("TOO_MANY_PARAMETERS"), StripWord(args));
 		return;
@@ -1176,21 +1085,21 @@ void DOS_Shell::CMD_PAUSE(char* args)
 void DOS_Shell::CMD_CALL(char * args)
 	{
 	HELP("CALL");
-	this->call = true;						// else the old batchfile will be closed first
-	this->ParseLine(args);					// OK, but where is call tested?
+	this->call = true;												// Else the old batchfile will be closed first
+	this->ParseLine(args);											// OK, but where is call tested?
 	this->call = false;
 	}
 
 void DOS_Shell::CMD_DATE(char * args)
 	{
 	HELP("DATE");	
-	if (*args)								// set date not supported, always return error
+	if (*args)														// Set date not supported, always return error
 		{
 		WriteOut(MSG_Get("NO_PARAMS"));
 		return;
 		}
 	_SYSTEMTIME systime;
-	GetLocalTime(&systime);					// return the Windows localdate
+	GetLocalTime(&systime);											// Return the Windows localdate
 
 	char buffer[21] = {0};
 	const char* datestring = MSG_Get("DATE:DAYS");
@@ -1220,35 +1129,22 @@ void DOS_Shell::CMD_DATE(char * args)
 void DOS_Shell::CMD_TIME(char * args)
 	{
 	HELP("TIME");
-	if (*args)										// set time not supported always return error
+	if (*args)														// Set time not supported always return error
 		{
 		WriteOut(MSG_Get("NO_PARAMS"));
 		return;
 		}
 	_SYSTEMTIME systime;
-	GetLocalTime(&systime);							// return Windows localtime
+	GetLocalTime(&systime);											// Return Windows localtime
 	WriteOut(MSG_Get("TIME:NOW"), systime.wHour, systime.wMinute, systime.wSecond, systime.wMilliseconds/10);
 	}
 
 void DOS_Shell::CMD_LOADHIGH(char* args)
 	{
 	HELP("LOADHIGH");
-	Bit16u umb_start = dos_infoblock.GetStartOfUMBChain();
-	if (umb_start == 0x9fff)
-		{
-		Bit8u umb_flag = dos_infoblock.GetUMBChainState();
-		Bit8u old_memstrat = (Bit8u)(DOS_GetMemAllocStrategy()&0xff);
-		if ((umb_flag&1) == 0)
-			DOS_LinkUMBsToMemChain(1);
-		DOS_SetMemAllocStrategy(0x80);				// search in UMBs first
-		this->ParseLine(args);
-		Bit8u current_umb_flag = dos_infoblock.GetUMBChainState();
-		if ((current_umb_flag&1) != (umb_flag&1))
-			DOS_LinkUMBsToMemChain(umb_flag);
-		DOS_SetMemAllocStrategy(old_memstrat);		// restore strategy
-		}
-	else
-		this->ParseLine(args);
+	LoadHigh = true;
+	this->DoCommand(args);
+	LoadHigh = false;
 	}
 
 void DOS_Shell::CMD_PROMPT(char *args)

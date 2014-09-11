@@ -1,6 +1,4 @@
 #include <stdlib.h>
-#include <string.h>
-
 #include "vDos.h"
 #include "callback.h"
 #include "mem.h"
@@ -60,7 +58,12 @@ void CALLBACK_Idle(void)
 
 static Bitu default_handler(void)
 	{
-	LOG(LOG_CPU, LOG_ERROR)("Illegal Unhandled Interrupt Called %X", lastint);
+	LOG_MSG("Unhandled interrupt called: %2X", lastint);
+	Bit32u addr = (Bit32u)MemBase+4*0x0e;
+	LOG_MSG("0:4xe: %x", *(Bit32u*)addr);
+	addr = dWord2Ptr(*(Bit32u*)addr);
+	LOG_MSG("addr: %x, val: %x", addr, *(Bit32u*)(MemBase+addr));
+
 	return CBRET_NONE;
 	}
 
@@ -422,13 +425,13 @@ void CALLBACK_HandlerObject::Set_RealVec(Bit8u vec)
 		{
 		vectorhandler.installed = true;
 		vectorhandler.interrupt = vec;
-		RealSetVec(vec,Get_RealPointer(), vectorhandler.old_vector);
+		RealSetVec(vec, Get_RealPointer(), vectorhandler.old_vector);
 		}
 	else
 		E_Exit ("CALLBACK: Double usage of vector handler");
 	}
 
-void CALLBACK_Init(Section* /*sec*/)
+void CALLBACK_Init()
 	{
 	for (Bitu i = 0; i < CB_MAX; i++)
 		CallBack_Handlers[i] = &illegal_handler;
@@ -478,7 +481,6 @@ void CALLBACK_Init(Section* /*sec*/)
 	vPC_rStosd(0x67*4, CALLBACK_RealPointer(call_default));
 	vPC_rStosd(0x68*4, CALLBACK_RealPointer(call_default));
 	vPC_rStosd(0x5c*4, CALLBACK_RealPointer(call_default));				// Network stuff
-	//vPC_rStosd(0xf*4,0); some games don't like it
 
 	// virtualizable in-out opcodes
 	call_priv_io = CALLBACK_Allocate();

@@ -28,10 +28,11 @@ rem LOW = ON
 
 rem Upper memory blocks are also not available.
 rem You can get an extra 127KB with: 
-UMB = ON
+rem UMB = ON
 
 rem Extended memory is always 16MB, that should be sufficient for any DOS program.
 
+EMS = ON
 
 Rem Mouse
 rem =====

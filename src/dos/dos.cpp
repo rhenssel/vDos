@@ -1,14 +1,9 @@
 #include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
 #include "vDos.h"
 #include "bios.h"
 #include "mem.h"
 #include "callback.h"
 #include "regs.h"
-#include "dos_inc.h"
-#include "setup.h"
-#include "support.h"
 #include "parport.h"
 #include "serialport.h"
 
@@ -374,7 +369,6 @@ static Bitu DOS_21Handler(void)
 			reg_al = 0;
 			SegSet16(ds, dos.tables.dpb);
 			reg_bx = drive;		// Faking only the first entry (that is the driveletter)
-			LOG(LOG_DOSMISC,LOG_ERROR)("Get drive parameter block.");
 			}
 		else
 			reg_al = 0xff;
@@ -465,6 +459,7 @@ static Bitu DOS_21Handler(void)
 		break;
 	case 0x39:		// MKDIR Create directory
 		vPC_rStrnCpy(name1, SegPhys(ds)+reg_dx, DOSNAMEBUF);
+		rSpTrim(name1);
 		if (DOS_MakeDir(name1))
 			{
 			reg_ax = 0x05;	// ax destroyed
@@ -478,6 +473,7 @@ static Bitu DOS_21Handler(void)
 		break;
 	case 0x3a:		// RMDIR Remove directory
 		vPC_rStrnCpy(name1, SegPhys(ds)+reg_dx, DOSNAMEBUF);
+		rSpTrim(name1);
 		if  (DOS_RemoveDir(name1))
 			{
 			reg_ax = 0x05;	// ax destroyed
@@ -491,6 +487,7 @@ static Bitu DOS_21Handler(void)
 		break;
 	case 0x3b:		// CHDIR Set current directory
 		vPC_rStrnCpy(name1, SegPhys(ds)+reg_dx, DOSNAMEBUF);
+		rSpTrim(name1);
 		if (DOS_ChangeDir(name1))
 			{
 			reg_ax = 0x00;	// ax destroyed
@@ -504,6 +501,7 @@ static Bitu DOS_21Handler(void)
 		break;
 	case 0x3c:		// CREATE Create or truncate file
 		vPC_rStrnCpy(name1, SegPhys(ds)+reg_dx, DOSNAMEBUF);
+		rSpTrim(name1);
 		if (DOS_CreateFile(name1, reg_cx, &reg_ax))
 			CALLBACK_SCF(false);
 		else
@@ -515,6 +513,7 @@ static Bitu DOS_21Handler(void)
 	case 0x3d:		// OPEN Open existing file
 		{
 		vPC_rStrnCpy(name1, SegPhys(ds)+reg_dx, DOSNAMEBUF);
+		rSpTrim(name1);
 		if (DOS_OpenFile(name1, reg_al, &reg_ax))
 			CALLBACK_SCF(false);
 		else
@@ -569,6 +568,7 @@ static Bitu DOS_21Handler(void)
 		break;
 	case 0x41:		// UNLINK Delete file
 		vPC_rStrnCpy(name1, SegPhys(ds)+reg_dx, DOSNAMEBUF);
+		rSpTrim(name1);
 		if (DOS_UnlinkFile(name1))
 			CALLBACK_SCF(false);
 		else
@@ -595,13 +595,14 @@ static Bitu DOS_21Handler(void)
 		break;
 	case 0x43:		// Get/Set file attributes
 		vPC_rStrnCpy(name1, SegPhys(ds)+reg_dx, DOSNAMEBUF);
+		rSpTrim(name1);
 		if (reg_al == 0)	// Get
 			{
 			Bit16u attr_val = reg_cx;
 			if (DOS_GetFileAttr(name1, &attr_val))
 				{
 				reg_cx = attr_val;
-				reg_ax = attr_val;	// Undocumented
+//				reg_ax = attr_val;	// Undocumented
 				CALLBACK_SCF(false);
 				}
 			else
@@ -612,7 +613,6 @@ static Bitu DOS_21Handler(void)
 			}
 		else if (reg_al == 1)	// Set
 			{
-			LOG(LOG_MISC,LOG_ERROR)("DOS:Set File Attributes for %s not supported",name1);
 			if (DOS_SetFileAttr(name1, reg_cx))
 				{
 				reg_ax = 0x202;	// ax destroyed
@@ -626,7 +626,6 @@ static Bitu DOS_21Handler(void)
 			}
 		else
 			{
-			LOG(LOG_MISC,LOG_ERROR)("DOS:0x43:Illegal subfunction %2X",reg_al);
 			reg_ax = 1;
 			CALLBACK_SCF(true);
 			}
@@ -674,7 +673,7 @@ static Bitu DOS_21Handler(void)
 			CALLBACK_SCF(true);
 			}
 		break;
-	case 0x48:		// Allocate memory
+	case 0x48:																				// Allocate memory
 		{
 		Bit16u size = reg_bx;
 		Bit16u seg;
@@ -691,7 +690,7 @@ static Bitu DOS_21Handler(void)
 			}
 		break;
 		}
-	case 0x49:		// Free memory
+	case 0x49:																		// Free memory
 		if (DOS_FreeMemory(SegValue(es)))
 			CALLBACK_SCF(false);
 		else
@@ -700,7 +699,7 @@ static Bitu DOS_21Handler(void)
 			CALLBACK_SCF(true);
 			}
 		break;
-	case 0x4a:		// Resize memory block
+	case 0x4a:																		// Resize memory block
 		{
 		Bit16u size = reg_bx;
 		if (DOS_ResizeMemory(SegValue(es), &size))
@@ -716,29 +715,39 @@ static Bitu DOS_21Handler(void)
 			}
 		}
 		break;
-	case 0x4b:		// EXEC Load and/or execute program
-		vPC_rStrnCpy(name1, SegPhys(ds)+reg_dx, DOSNAMEBUF);
-		if (!DOS_Execute(name1, SegPhys(es)+reg_bx, reg_al))
+	case 0x4b:																		// EXEC Load and/or execute program
+		if (reg_al > 3)
 			{
-			reg_ax = dos.errorcode;
+			reg_ax = 1;
 			CALLBACK_SCF(true);
 			}
+		else
+			{
+			vPC_rStrnCpy(name1, SegPhys(ds)+reg_dx, DOSNAMEBUF);
+			rSpTrim(name1);
+			if (!DOS_Execute(name1, SegPhys(es)+reg_bx, reg_al))
+				{
+				reg_ax = dos.errorcode;
+				CALLBACK_SCF(true);
+				}
+			else
+				CALLBACK_SCF(false);
+			}
 		break;
-// TODO Check for use of execution state AL=5
-	case 0x4c:		// EXIT Terminate with return code
+	case 0x4c:																		// EXIT Terminate with return code
 		DOS_Terminate(dos.psp(), false, reg_al);
 		break;
-	case 0x4d:		// Get Return code
-		reg_al = dos.return_code;	// Officially read from SDA and clear when read
+	case 0x4d:																		// Get Return code
+		reg_al = dos.return_code;													// Officially read from SDA and clear when read
 		reg_ah = dos.return_mode;
 		break;
-	case 0x4e:												// FINDFIRST Find first matching file
+	case 0x4e:																		// FINDFIRST Find first matching file
 		vPC_rStrnCpy(name1, SegPhys(ds)+reg_dx, DOSNAMEBUF);
-		DosPathStripSpaces(name1);							// NB FiAd calls this with 8.3 format
+		DosPathStripSpaces(name1);													// NB FiAd calls this with 8.3 format
 		if (DOS_FindFirst(name1, reg_cx))
 			{
 			CALLBACK_SCF(false);	
-			reg_ax = 0;										// Undocumented
+			reg_ax = 0;																// Undocumented
 			}
 		else
 			{
@@ -746,12 +755,11 @@ static Bitu DOS_21Handler(void)
 			CALLBACK_SCF(true);
 			}
 		break;		 
-	case 0x4f:												// FINDNEXT Find next matching file
+	case 0x4f:																		// FINDNEXT Find next matching file
 		if (DOS_FindNext())
 			{
 			CALLBACK_SCF(false);
-			// reg_ax=0xffff;								// Undocumented
-			reg_ax = 0;										// Undocumented:Qbix Willy beamish
+			reg_ax = 0;																// Undocumented:Qbix Willy beamish
 			}
 		else
 			{
@@ -759,35 +767,35 @@ static Bitu DOS_21Handler(void)
 			CALLBACK_SCF(true);
 			}
 		break;		
-	case 0x50:		// Set current PSP
+	case 0x50:																		// Set current PSP
 		dos.psp(reg_bx);
 		break;
-	case 0x51:		// Get current PSP
+	case 0x51:																		// Get current PSP
 		reg_bx = dos.psp();
 		break;
-	case 0x52:		// Get list of lists
+	case 0x52:																		// Get list of lists
 		{
 		RealPt addr = dos_infoblock.GetPointer();
 		SegSet16(es, RealSeg(addr));
 		reg_bx = RealOff(addr);
 		}
 		break;
-// TODO Think hard how shit this is gonna be
-// And will any gamer ever use this :)
-	case 0x53:		// Translate BIOS parameter block to drive parameter block
+	case 0x53:																		// Translate BIOS parameter block to drive parameter block
 		E_Exit("Unhandled Dos 21 call %02X", reg_ah);
 		break;
-	case 0x54:		// Get verify flag
+	case 0x54:																		// Get verify flag
 		reg_al = dos.verify ? 1 : 0;
 		break;
-	case 0x55:		// Create Child PSP
+	case 0x55:																		// Create Child PSP
 		DOS_ChildPSP(reg_dx, reg_si);
 		dos.psp(reg_dx);
 		reg_al = 0xf0;	// al destroyed
 		break;
-	case 0x56:		// RENAME Rename file
+	case 0x56:																		// Rename file
 		vPC_rStrnCpy(name1, SegPhys(ds)+reg_dx, DOSNAMEBUF);
+		rSpTrim(name1);
 		vPC_rStrnCpy(name2, SegPhys(es)+reg_di, DOSNAMEBUF);
+		rSpTrim(name2);
 		if (DOS_Rename(name1, name2))
 			CALLBACK_SCF(false);			
 		else
@@ -796,24 +804,19 @@ static Bitu DOS_21Handler(void)
 			CALLBACK_SCF(true);
 			}
 		break;		
-	case 0x57:		// Get/Set File's Date and Time
+	case 0x57:																		// Get/set File's date and time
 		if (reg_al == 0)
 			CALLBACK_SCF(DOS_GetFileDate(reg_bx, &reg_cx, &reg_dx) ? false : true);
 		else if (reg_al == 1)
-			{
-			LOG(LOG_DOSMISC,LOG_ERROR)("DOS:57:Set File Date Time Faked");
 			CALLBACK_SCF(false);		
-			}
-		else
-			LOG(LOG_DOSMISC,LOG_ERROR)("DOS:57:Unsupported subtion %X",reg_al);
 		break;
-	case 0x58:		// Get/Set Memory allocation strategy
+	case 0x58:																		// Get/set memory allocation strategy
 		switch (reg_al)
 			{
-		case 0:					// Get Strategy
+		case 0:																		// Get strategy
 			reg_ax = DOS_GetMemAllocStrategy();
 			break;
-		case 1:					// Set Strategy
+		case 1:																		// Set strategy
 			if (DOS_SetMemAllocStrategy(reg_bx))
 				CALLBACK_SCF(false);
 			else
@@ -822,11 +825,11 @@ static Bitu DOS_21Handler(void)
 				CALLBACK_SCF(true);
 				}
 			break;
-		case 2:					// Get UMB Link Status
+		case 2:																		// Get UMB link status
 			reg_al = dos_infoblock.GetUMBChainState()&1;
 			CALLBACK_SCF(false);
 			break;
-		case 3:					// Set UMB Link Status
+		case 3:																		// Set UMB link status
 			if (DOS_LinkUMBsToMemChain(reg_bx))
 				CALLBACK_SCF(false);
 			else
@@ -836,21 +839,20 @@ static Bitu DOS_21Handler(void)
 				}
 			break;
 		default:
-			LOG(LOG_DOSMISC,LOG_ERROR)("DOS:58:Not Supported Set//Get memory allocation call %X", reg_al);
 			reg_ax = 1;
 			CALLBACK_SCF(true);
 			}
 		break;
-	case 0x59:			// Get Extended error information
+	case 0x59:																		// Get extended error information
 		reg_ax = dos.errorcode;
 		if (dos.errorcode == DOSERR_FILE_NOT_FOUND || dos.errorcode == DOSERR_PATH_NOT_FOUND)
-			reg_bh = 8;	// Not Found error class (Road Hog)
+			reg_bh = 8;																// Not found error class (Road Hog)
 		else
-			reg_bh = 0;	// Unspecified error class
-		reg_bl = 1;		// Retry retry retry
-		reg_ch = 0;		// Unkown error locus
+			reg_bh = 0;																// Unspecified error class
+		reg_bl = 1;																	// Retry retry retry
+		reg_ch = 0;																	// Unkown error locus
 		break;
-	case 0x5a:			// Create temporary file
+	case 0x5a:																		// Create temporary file
 		{
 		vPC_rStrnCpy(name1, SegPhys(ds)+reg_dx, DOSNAMEBUF);
 		Bit16u handle;
@@ -867,11 +869,12 @@ static Bitu DOS_21Handler(void)
 			}
 		}
 		break;
-	case 0x5b:			// Create new file
+	case 0x5b:																		// Create new file
 		{
 		vPC_rStrnCpy(name1, SegPhys(ds)+reg_dx, DOSNAMEBUF);
+		rSpTrim(name1);
 		Bit16u handle;
-		if (DOS_OpenFile(name1, 0, &handle))			// ??? what about devices ???
+		if (DOS_OpenFile(name1, 0, &handle))										// ??? what about devices ???
 			{
 			DOS_CloseFile(handle);
 			DOS_SetError(DOSERR_FILE_ALREADY_EXISTS);
@@ -891,7 +894,7 @@ static Bitu DOS_21Handler(void)
 			}
 		}
 		break;
-	case 0x5c:			// FLOCK File region locking
+	case 0x5c:																		// FLOCK File region locking
 		{
 		if (DOS_LockFile(reg_bx, reg_al, (reg_cx<<16) + reg_dx, (reg_si<<16) + reg_di))
 			{
@@ -905,22 +908,40 @@ static Bitu DOS_21Handler(void)
 			}
 		}
 		break;
-	case 0x5d:			// Network Functions
+	case 0x5d:																		// Network Functions
 		if (reg_al == 0x06)
 			{
 			SegSet16(ds, DOS_SDA_SEG);
 			reg_si = DOS_SDA_OFS;
-//			reg_cx = 0x80;									// swap if in dos
-			reg_cx = 0x78c;									// found by Edward Mendelson, fixes problems with WP (others) shelling out
-			reg_dx = 0x1a;									// swap always
+//			reg_cx = 0x80;															// Swap if in dos
+			reg_cx = 0x78c;															// Found by Edward Mendelson, fixes problems with WP (others) shelling out
+			reg_dx = 0x1a;															// Swap always
 			}
 		break;
-	case 0x5f:			// Network redirection
-		reg_ax = 1;		// Failing it
+	case 0x5e:																		// Network
+		if (reg_al == 0)															// Get machine name
+			{
+			DWORD size = DOSNAMEBUF;
+			GetComputerName(name1, &size);
+			if (size)
+				{
+				vPC_rBlockWrite(SegPhys(ds)+reg_dx, name1, 16);
+				if (strlen(name1) < 16)												// Name is 16 bytes, space padded
+					vPC_rStoswb(SegPhys(ds)+reg_dx+strlen(name1), 0x2020, 16-strlen(name1)); 
+				reg_cx = 0x1ff;														// 01h name valid, FFh NetBIOS number for machine name
+				CALLBACK_SCF(false);
+				break;
+				}
+			}
+		CALLBACK_SCF(true);
+		break;
+	case 0x5f:																		// Network redirection
+		reg_ax = 1;																	// Failing it
 		CALLBACK_SCF(true);
 		break; 
-	case 0x60:			// Canonicalize filename or path
+	case 0x60:																		// Canonicalize filename or path
 		vPC_rStrnCpy(name1, SegPhys(ds)+reg_si, DOSNAMEBUF);
+		rSpTrim(name1);
 		if (DOS_Canonicalize(name1, name2))
 			{
 			vPC_rBlockWrite(SegPhys(es)+reg_di, name2, (Bitu)(strlen(name2)+1));	
@@ -932,33 +953,31 @@ static Bitu DOS_21Handler(void)
 			CALLBACK_SCF(true);
 			}
 		break;
-	case 0x62:			// Get Current PSP Address */
+	case 0x62:																		// Get Current PSP Address
 		reg_bx = dos.psp();
 		break;
-	case 0x63:			// DOUBLE BYTE CHARACTER SET
+	case 0x63:																		// DOUBLE BYTE CHARACTER SET
 		if (reg_al == 0)
 			{
 			SegSet16(ds, RealSeg(dos.tables.dbcs));
 			reg_si = RealOff(dos.tables.dbcs);		
 			reg_al = 0;
-			CALLBACK_SCF(false);	// undocumented
+			CALLBACK_SCF(false);													// Undocumented
 			}
 		else
-			reg_al = 0xff;	// Doesn't officially touch carry flag
+			reg_al = 0xff;															// Doesn't officially touch carry flag
 		break;
-	case 0x64:				// Set device driver lookahead flag
+	case 0x64:																		// Set device driver lookahead flag
 		break;
-	case 0x65:				// Get extented country information and a lot of other useless shit
+	case 0x65:																		// Get extented country information and a lot of other useless shit
 			{
-			// Todo maybe fully support this for now we set it standard for USA
-			LOG(LOG_DOSMISC,LOG_ERROR)("DOS:65:Extended country information call %X", reg_ax);
-			if ((reg_al <=  0x07) && (reg_cx < 0x05))
+			if ((reg_al <= 7) && (reg_cx < 5))										// Todo maybe fully support this for now we set it standard for USA
 				{
 				DOS_SetError(DOSERR_FUNCTION_NUMBER_INVALID);
 				CALLBACK_SCF(true);
 				break;
 				}
-			Bitu len = 0;	// For 0x21 and 0x22
+			Bitu len = 0;															// For 0x21 and 0x22
 			PhysPt data = SegPhys(es)+reg_di;
 			switch (reg_al)
 				{
@@ -971,64 +990,63 @@ static Bitu DOS_21Handler(void)
 				if(reg_cx > 0x08)
 					{
 					Bitu amount = (reg_cx>=0x29) ? 0x22 : (reg_cx-7);
-					vPC_rBlockWrite(data + 0x07, dos.tables. country,amount);
+					vPC_rBlockWrite(data + 0x07, dos.tables. country, amount);
 					reg_cx = (reg_cx>=0x29) ? 0x29 : reg_cx;
 					}
 				CALLBACK_SCF(false);
 				break;
-			case 0x05:	// Get pointer to filename terminator table
+			case 0x05:																// Get pointer to filename terminator table
 				vPC_rStosb(data + 0x00, reg_al);
 				vPC_rStosd(data + 0x01, dos.tables.filenamechar);
 				reg_cx = 5;
 				CALLBACK_SCF(false);
 				break;
-			case 0x02:	// Get pointer to uppercase table
+			case 0x02:																// Get pointer to uppercase table
 				vPC_rStosb(data + 0x00, reg_al);
 				vPC_rStosd(data + 0x01, dos.tables.upcase);
 				reg_cx = 5;
 				CALLBACK_SCF(false);
 				break;
-			case 0x06:	// Get pointer to collating sequence table
+			case 0x06:																// Get pointer to collating sequence table
 				vPC_rStosb(data + 0x00, reg_al);
 				vPC_rStosd(data + 0x01, dos.tables.collatingseq);
 				reg_cx = 5;
 				CALLBACK_SCF(false);
 				break;
-			case 0x03:	// Get pointer to lowercase table
-			case 0x04:	// Get pointer to filename uppercase table
-			case 0x07:	// Get pointer to double byte char set table
+			case 0x03:																// Get pointer to lowercase table
+			case 0x04:																// Get pointer to filename uppercase table
+			case 0x07:																// Get pointer to double byte char set table
 				vPC_rStosb(data + 0x00, reg_al);
-				vPC_rStosd(data + 0x01, dos.tables.dbcs);	//used to be 0
+				vPC_rStosd(data + 0x01, dos.tables.dbcs);							// Used to be 0
 				reg_cx = 5;
 				CALLBACK_SCF(false);
 				break;
-			case 0x20: // Capitalize Character
+			case 0x20:																// Capitalize Character
 				reg_dl = (Bit8u)toupper(reg_dl);
 				CALLBACK_SCF(false);
 				break;
-			case 0x21:	// Capitalize String (cx=length)
-			case 0x22:	// Capatilize ASCIZ string
+			case 0x21:																// Capitalize String (cx=length)
+			case 0x22:																// Capatilize ASCIZ string
 				data = SegPhys(ds) + reg_dx;
 				len = (reg_al == 0x21) ? reg_cx : vPC_rStrLen(data);
 				if (len)
 					{
-					if (len + reg_dx > DOS_COPYBUFSIZE - 1)		// Is limited to 65535 / within DS
+					if (len + reg_dx > DOS_COPYBUFSIZE - 1)							// Is limited to 65535 / within DS
 						E_Exit("DOS: 0x65 Buffer overflow");
 					vPC_rBlockRead(data, dos_copybuf, len);
 					dos_copybuf[len] = 0;
-					// No upcase as String(0x21) might be multiple asciz strings
-					for (Bitu count = 0; count < len; count++)
+					for (Bitu count = 0; count < len; count++)						// No upcase as String(0x21) might be multiple asciiz strings
 						dos_copybuf[count] = (Bit8u)toupper(*reinterpret_cast<unsigned char*>(dos_copybuf+count));
 					vPC_rBlockWrite(data, dos_copybuf, len);
 					}
 				CALLBACK_SCF(false);
 				break;
 			default:
-				E_Exit("DOS-0x65: Unhandled country information call %2X",reg_al);	
+				E_Exit("DOS-0x65: Unhandled country information call %2X", reg_al);	
 				}
 			}
 		break;
-	case 0x66:			// Get/Set global code page table
+	case 0x66:																		// Get/set global code page table
 		if (reg_al == 1)
 			{
 			reg_bx = reg_dx = dos.loaded_codepage;
@@ -1036,7 +1054,7 @@ static Bitu DOS_21Handler(void)
 			break;
 			}
 		break;
-	case 0x67:			// Set handle count
+	case 0x67:																		// Set handle count
 		{
 		// Weird call to increase amount of file handles needs to allocate memory if >20
 		DOS_PSP psp(dos.psp());
@@ -1044,7 +1062,7 @@ static Bitu DOS_21Handler(void)
 		CALLBACK_SCF(false);
 		}
 		break;
-	case 0x68:			// FFLUSH Commit file
+	case 0x68:																		// FFLUSH Commit file
 	case 0x6a:
 		if (DOS_FlushFile(reg_bl))
 			CALLBACK_SCF(false);
@@ -1054,11 +1072,12 @@ static Bitu DOS_21Handler(void)
 			CALLBACK_SCF(true);
 			}
 		break;
-	case 0x69:			// Get/Set disk serial number
-		CALLBACK_SCF(true);			// what about AX = error code?
+	case 0x69:																		// Get/set disk serial number
+		CALLBACK_SCF(true);															// What about AX = error code?
 		break;
-	case 0x6c:			// Extended Open/Create
+	case 0x6c:																		// Extended Open/Create
 		vPC_rStrnCpy(name1, SegPhys(ds)+reg_si, DOSNAMEBUF);
+		rSpTrim(name1);
 		if (DOS_OpenFileExtended(name1, reg_bx, reg_cx, reg_dx, &reg_ax, &reg_cx))
 			CALLBACK_SCF(false);
 		else
@@ -1066,10 +1085,6 @@ static Bitu DOS_21Handler(void)
 			reg_ax = dos.errorcode;
 			CALLBACK_SCF(true);
 			}
-		break;
-	case 0x71:			// Unknown, probably 4dos detection!!!
-		reg_ax = 0x7100;
-		CALLBACK_SCF(true);
 		break;
 //	case 0xE0:
 //	case 0x18:	
@@ -1081,7 +1096,7 @@ static Bitu DOS_21Handler(void)
 //	case 0xEF:			// Used in Ancient Art Of War CGA
 //	case 0x5e:			// More Network Functions
 	default:
-		LOG_MSG("DOS:Unhandled call %02X AL=%02X",reg_ah,reg_al);
+		LOG_MSG("Unhandled int 21H call %02X AL=%02X", reg_ah, reg_al);
 		reg_al = 0;		// default value
 		break;
 		}
@@ -1095,9 +1110,9 @@ static Bitu DOS_20Handler(void)
 	return CBRET_NONE;
 	}
 
-static Bitu DOS_27Handler(void)			// Terminate & stay resident
+static Bitu DOS_27Handler(void)														// Terminate & stay resident
 	{
-	Bit16u para = (reg_dx/16)+((reg_dx % 16) > 0);
+	Bit16u para = (reg_dx+15)/16;
 	Bit16u psp = dos.psp();	
 	if (DOS_ResizeMemory(psp, &para))
 		DOS_Terminate(psp, true, 0);
@@ -1118,85 +1133,56 @@ static Bitu DOS_26Handler(void)
     return CBRET_NONE;
 	}
 
-static Bitu DOS_28Handler(void)			// Dos Idle
+static Bitu DOS_28Handler(void)														// DOS idle
 	{
 	idleCount = idleTrigger;
     return CBRET_NONE;
 	}
 
-class DOS:public Module_base
+
+static CALLBACK_HandlerObject callback[7];
+
+void DOS_Init()
 	{
-private:
-	CALLBACK_HandlerObject callback[7];
-public:
-	DOS(Section* configuration):Module_base(configuration)
-		{
-		callback[0].Install(DOS_20Handler, CB_IRET, "DOS Int 20");
-		callback[0].Set_RealVec(0x20);
+	callback[0].Install(DOS_20Handler, CB_IRET, "DOS Int 20");
+	callback[0].Set_RealVec(0x20);
 
-		callback[1].Install(DOS_21Handler, CB_IRET_STI, "DOS Int 21");
-		callback[1].Set_RealVec(0x21);
-		// Pseudo code for int 21
-		// sti
-		// callback 
-		// iret
-		// retf  <- int 21 4c jumps here to mimic a retf Cyber
+	callback[1].Install(DOS_21Handler, CB_IRET_STI, "DOS Int 21");
+	callback[1].Set_RealVec(0x21);
+	// Pseudo code for int 21
+	// sti
+	// callback 
+	// iret
+	// retf  <- int 21 4c jumps here to mimic a retf Cyber
 
-		callback[2].Install(DOS_25Handler, CB_RETF, "DOS Int 25");
-		callback[2].Set_RealVec(0x25);
-
-		callback[3].Install(DOS_26Handler, CB_RETF, "DOS Int 26");
-		callback[3].Set_RealVec(0x26);
-
-		callback[4].Install(DOS_27Handler, CB_IRET, "DOS Int 27");
-		callback[4].Set_RealVec(0x27);
-
+	callback[2].Install(DOS_25Handler, CB_RETF, "DOS Int 25");
+	callback[2].Set_RealVec(0x25);
+	callback[3].Install(DOS_26Handler, CB_RETF, "DOS Int 26");
+	callback[3].Set_RealVec(0x26);
+	callback[4].Install(DOS_27Handler, CB_IRET, "DOS Int 27");
+	callback[4].Set_RealVec(0x27);
 //		callback[5].Install(NULL, CB_IRET/*CB_INT28*/, "DOS idle");
 //		callback[5].Install(DOS_28Handler, CB_HOOKABLE, "DOS idle");		// doesn't work !
-		callback[5].Install(DOS_28Handler, CB_IRET, "DOS idle");
-		callback[5].Set_RealVec(0x28);
+	callback[5].Install(DOS_28Handler, CB_IRET, "DOS idle");
+	callback[5].Set_RealVec(0x28);
+	callback[6].Install(NULL, CB_INT29, "CON Output Int 29");
+	callback[6].Set_RealVec(0x29);
+	// pseudocode for CB_INT29:
+	//	push ax
+	//	mov ah, 0x0e
+	//	int 0x10
+	//	pop ax
+	//	iret
 
-		callback[6].Install(NULL, CB_INT29, "CON Output Int 29");
-		callback[6].Set_RealVec(0x29);
-		// pseudocode for CB_INT29:
-		//	push ax
-		//	mov ah, 0x0e
-		//	int 0x10
-		//	pop ax
-		//	iret
+	DOS_SetupFiles();								// Setup system File tables
+	DOS_SetupDevices();								// Setup dos devices
+	DOS_SetupTables();
+	DOS_SetupMemory(ConfGetBool("low"));			// Setup first MCB
+	DOS_SetupMisc();								// Some additional dos interrupts
+	DOS_SDA(DOS_SDA_SEG,DOS_SDA_OFS).SetDrive(25);	// Else the next call gives a warning.
+	DOS_SetDefaultDrive(25);
 
-		Section_prop * section = static_cast<Section_prop *>(configuration);
-//		DOS_FILES = section->Get_int("files");
-		DOS_SetupFiles();								// Setup system File tables
-		DOS_SetupDevices();								// Setup dos devices
-		DOS_SetupTables();
-		DOS_SetupMemory(section->Get_bool("low"));		// Setup first MCB
-		DOS_SetupMisc();								// Some additional dos interrupts
-		DOS_SDA(DOS_SDA_SEG,DOS_SDA_OFS).SetDrive(25);	// Else the next call gives a warning.
-		DOS_SetDefaultDrive(25);
-	
-		dos.version.major = 5;
-		dos.version.minor = 0;
-		}
-	~DOS()
-		{
-		for (Bit16u i = 0; i < DOS_DRIVES; i++)
-			delete Drives[i];
-		delete [] Files;
-		}
-	};
-
-static DOS* test;
-
-void DOS_ShutDown(Section* /*sec*/)
-	{
-	delete test;
-	}
-
-void DOS_Init(Section* sec)
-	{
-	test = new DOS(sec);
+	dos.version.major = 5;
+	dos.version.minor = 0;
 	dos.loaded_codepage = GetOEMCP();
-	// shutdown function
-	sec->AddDestroyFunction(&DOS_ShutDown);
 	}

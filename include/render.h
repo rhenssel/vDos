@@ -55,7 +55,8 @@ extern Render_t render;
 extern Render_ttf ttf;
 extern ScalerLineHandler_t RENDER_DrawLine;
 extern Bit16u curAttrChar[];					// currently displayed textpage
-extern Bit16u newAttrChar[];					// to be replaced by
+//extern Bit16u newAttrChar[];					// to be replaced by
+extern Bit16u * newAttrChar;					// to be replaced by
 
 void RENDER_SetSize(Bitu width,Bitu height);
 bool RENDER_StartUpdate(void);
@@ -64,7 +65,7 @@ void RENDER_Halt(void);
 void RENDER_Reset(void);
 
 extern bool colorsLocked;
-INLINE void RENDER_SetPal(Bit8u entry, Bit8u red, Bit8u green, Bit8u blue)
+inline void RENDER_SetPal(Bit8u entry, Bit8u red, Bit8u green, Bit8u blue)
 	{
 	render.pal.rgb[entry].red = red;
 	render.pal.rgb[entry].green = green;

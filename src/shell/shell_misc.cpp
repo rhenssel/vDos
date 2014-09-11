@@ -261,7 +261,7 @@ bool DOS_Shell::Execute(char* name, char* args)
 	char line[CMD_MAXLINE];
 	if (strlen(args) != 0)
 		{
-		if (*args != ' ')							// put a space in front (Jos: why?)
+		if (*args != ' ')												// Put a space in front (Jos: why?)
 			{	
 			line[0] = ' ';
 			strncpy(line+1, args, CMD_MAXLINE-2);
@@ -272,72 +272,60 @@ bool DOS_Shell::Execute(char* name, char* args)
 		}
 	else
 		line[0] = 0;
-	// Check for a full name
-	char* fullname = Which(name);
+	
+	char* fullname = Which(name);										// Check for a full name
 	if (!fullname)
 		return false;
 
-	char* extension = strrchr(fullname, '.');		// extension is eventualy added by Which
-	if (stricmp(extension, ".BAT") == 0) 
+	char* extension = strrchr(fullname, '.');							// Extension is eventualy added by Which
+	if (stricmp(extension, ".BAT") == 0)								// Run the .bat file, delete old batch file if call is not active
 		{
-		// Run the .bat file
-		// delete old batch file if call is not active
-		bool temp_echo = echo;	// keep the current echostate (as delete bf might change it )
+		bool temp_echo = echo;											// Keep the current echostate (as delete bf might change it )
 		if (bf && !call)
 			delete bf;
 		bf = new BatchFile(this, fullname, name, line);
-		echo = temp_echo;		// restore it.
+		echo = temp_echo;												// Restore it.
 		} 
 	else 
 		{
-		// only .bat .exe .com extensions may be be executed by the shell
-		if (stricmp(extension, ".COM") && stricmp(extension, ".EXE"))
+		if (stricmp(extension, ".COM") && stricmp(extension, ".EXE"))	// Only .bat .exe .com extensions may be be executed by the shell
 			return false;
-		// Run the .exe or .com file from the shell
-		// Allocate some stack space for tables in physical memory
-		reg_sp -= 0x200;
-		// Add Parameter block
-		DOS_ParamBlock block(SegPhys(ss)+reg_sp);
+		reg_sp -= 0x200;												// Allocate some stack space for tables in physical memory
+		
+		DOS_ParamBlock block(SegPhys(ss)+reg_sp);						// Add Parameter block
 		block.Clear();
-		// Add a filename
-		RealPt file_name = RealMakeSeg(ss, reg_sp+0x20);
+		RealPt file_name = RealMakeSeg(ss, reg_sp+0x20);				// Add a filename
 		vPC_rBlockWrite(dWord2Ptr(file_name), fullname, (Bitu)(strlen(fullname)+1));
 
-		// Fill the command line
-		CommandTail cmdtail;
+		CommandTail cmdtail;											// Fill the command line
 		cmdtail.count = 0;
-		memset(&cmdtail.buffer, 0, 127);	// Else some part of the string is unitialized (valgrind)
+		memset(&cmdtail.buffer, 0, 127);								// Else some part of the string is unitialized (valgrind)
 		if (strlen(line) > 126)
 			line[126] = 0;
 		cmdtail.count = (Bit8u)strlen(line);
 		memcpy(cmdtail.buffer, line, strlen(line));
 		cmdtail.buffer[strlen(line)] = 0xd;
-		// Copy command line in stack block too
-		vPC_rBlockWrite(SegPhys(ss)+reg_sp+0x100, &cmdtail, 128);
-		// Parse FCB (first two parameters) and put them into the current DOS_PSP
+		
+		vPC_rBlockWrite(SegPhys(ss)+reg_sp+0x100, &cmdtail, 128);		// Copy command line in stack block too
+																		// Parse FCB (first two parameters) and put them into the current DOS_PSP
 		Bit8u add;
 		FCB_Parsename(dos.psp(), 0x5C, 0x00, cmdtail.buffer, &add);
 		FCB_Parsename(dos.psp(), 0x6C, 0x00, &cmdtail.buffer[add], &add);
 		block.exec.fcb1 = SegOff2dWord(dos.psp(), 0x5C);
 		block.exec.fcb2 = SegOff2dWord(dos.psp(), 0x6C);
-		// Set the command line in the block and save it
-		block.exec.cmdtail = RealMakeSeg(ss, reg_sp+0x100);
+		block.exec.cmdtail = RealMakeSeg(ss, reg_sp+0x100);				// Set the command line in the block and save it
 		block.SaveData();
 
-		// Start up a dos execute interrupt
-		reg_ax = 0x4b00;
-		// Filename pointer
-		SegSet16(ds, SegValue(ss));
+		reg_ax = 0x4b00;												// Start up a dos execute interrupt
+		SegSet16(ds, SegValue(ss));										// Filename pointer
 		reg_dx = RealOff(file_name);
-		// Paramblock
-		SegSet16(es, SegValue(ss));
+		SegSet16(es, SegValue(ss));										// Paramblock
 		reg_bx = reg_sp;
 		SETFLAGBIT(IF, false);
 		CALLBACK_RunRealInt(0x21);
-		// Restore CS:IP and the stack
-		reg_sp += 0x200;
+		reg_sp += 0x200;												// Restore CS:IP and the stack
 		}
-	return true;	// Executable started
+	return true;														// Executable started
 	}
 
 char * DOS_Shell::Which(char* name)
@@ -349,8 +337,7 @@ char * DOS_Shell::Which(char* name)
 	bool has_extension = false;
 	bool has_path = false;
 	char* pos;
-	// parh, extension specified?
-	if (pos = strrchr(name, '\\'))
+	if (pos = strrchr(name, '\\'))										// Path, extension specified?
 		{
 		has_path = true;
 		if (strchr(pos, '.'))
@@ -361,41 +348,37 @@ char * DOS_Shell::Which(char* name)
 	if (has_extension && DOS_FileExists(name))
 		return name;
 
-	// try to find .com .exe .bat appended
-	static char which_ret[DOS_PATHLENGTH+4];
+	static char which_ret[DOS_PATHLENGTH+4];							// Try to find .com .exe .bat appended
 	if (!has_extension)
 		for (int i = 0; i < 3; i++)
 			if (DOS_FileExists(strcat(strcpy(which_ret, name), exec_ext[i])))
 				return which_ret;
-	if (has_path || name[1] == ':')					// if path or drive included FAIL (not found above)
+	if (has_path || name[1] == ':')										// If path or drive included FAIL (not found above)
 		return 0;
 
-	// No drive or path in filename, look through path environment string
-	char path[DOS_PATHLENGTH];
+	char path[DOS_PATHLENGTH];											// No drive or path in filename, look through path environment string
 	if (const char* pathenv = GetEnvStr("PATH"))
 		while (*pathenv)
 		{
-		while (*pathenv == ';')			// remove ;'s at the beginnings
+		while (*pathenv == ';')											// Remove ;'s at the beginnings
 			pathenv++;
-		// get next entry
-		Bitu i_path = 0;
+		Bitu i_path = 0;												// Get next entry
 		while (*pathenv && (*pathenv != ';') && (i_path < DOS_PATHLENGTH-1))
 			path[i_path++] = *pathenv++;
 
-		if (i_path == DOS_PATHLENGTH-1)		// If max size. move till next ;
+		if (i_path == DOS_PATHLENGTH-1)									// If max size. move till next ;
 			while (*pathenv && (*pathenv != ';')) 
 				pathenv++;
 		path[i_path] = 0;
 
-		// check entry
-		if (size_t len = strlen(path))
+		if (size_t len = strlen(path))									// Check entry
 			{
 			if (path[len - 1] != '\\')
 				{
 				strcat(path, "\\"); 
 				len++;
 				}
-			if ((name_len + len + 1) >= DOS_PATHLENGTH)		// If name too long =>next
+			if ((name_len + len + 1) >= DOS_PATHLENGTH)					// If name too long =>next
 				continue;
 			if (DOS_FileExists(strcat(path, name)))
 				return strcpy(which_ret, path);

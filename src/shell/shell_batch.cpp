@@ -94,7 +94,7 @@ again:
 		}
 		while (c != '\n' && n);
 	*cmd_write++ = 0;
-	char *nospace = trim(cmd_buffer);
+	char *nospace = lrTrim(cmd_buffer);
 	if (nospace[0] == ':')
 		{
 		nospace++;		// Skip :

@@ -1,15 +1,7 @@
-#include <vector>
-#include <sstream>
-#include <ctype.h>
 #include <stdlib.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <string.h>
 #include "programs.h"
 #include "callback.h"
-#include "regs.h"
 #include "support.h"
-#include "control.h"
 #include "shell.h"
 
 // This registers a file on the virtual drive and creates the correct structure for it
@@ -60,13 +52,12 @@ static Bitu PROGRAMS_Handler(void)
 
 Program::Program()
 	{
-	// Setup the PSP and find get command line
-	psp = new DOS_PSP(dos.psp());
+	psp = new DOS_PSP(dos.psp());												// Setup the PSP and find get command line
 	CommandTail tail;
 	vPC_rBlockRead(SegOff2Ptr(dos.psp(), 128), &tail, 128);
 	tail.buffer[tail.count < 127 ? tail.count : 126] = 0;
-	// Scan environment for filename
-	char * envPtr = (char *)(MemBase + (psp->GetEnvironment()<<4));
+
+	char * envPtr = (char *)(MemBase + (psp->GetEnvironment()<<4));				// Scan environment for filename
 	while (*envPtr)
 		envPtr += strlen(envPtr)+1;
 	envPtr += 3;
@@ -119,7 +110,6 @@ char * Program::GetEnvNum(Bitu num)
 	return NULL;
 	}
 
-
 bool Program::SetEnv(const char* entry, const char* new_string)
 	{
 	PhysPt env_read = SegOff2Ptr(psp->GetEnvironment(), 0);
@@ -154,7 +144,7 @@ bool Program::SetEnv(const char* entry, const char* new_string)
 	return true;
 	}
 
-void PROGRAMS_Init(Section* /*sec*/)
+void PROGRAMS_Init()
 	{
 	// Setup a special callback to start virtual programs
 	Bitu call_program = CALLBACK_Allocate();

@@ -50,12 +50,12 @@ public:
 	~IO_WriteHandleObject();
 	};
 
-static INLINE void IO_Write(Bitu port, Bit8u val)
+static inline void IO_Write(Bitu port, Bit8u val)
 	{
 	IO_WriteB(port, val);
 	}
 
-static INLINE Bit8u IO_Read(Bitu port)
+static inline Bit8u IO_Read(Bitu port)
 	{
 	return (Bit8u)IO_ReadB(port);
 	}

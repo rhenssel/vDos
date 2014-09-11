@@ -1,6 +1,4 @@
-#include <string.h>
 #include "vdos.h"
-#include "pic.h"
 #include "bios.h"					// SetComPorts(..)
 
 #include "serialport.h"
@@ -51,32 +49,14 @@ bool CSerial::Getchar(Bit8u* data)
 CSerial* serialPorts[4] = {0, 0, 0, 0};
 static device_PRT* dosdevices[9];
 
-void SERIAL_Destroy (Section * sec)
+void SERIAL_Init()
 	{
-	for (Bitu i = 0; i < 9; i++)
-		{
-		if (i < 4 && serialPorts[i])
-			{
-			delete serialPorts[i];
-			serialPorts[i] = 0;
-			}
-		if (dosdevices[i])
-			{
-			DOS_DelDevice(dosdevices[i]);
-			dosdevices[i] = 0;
-			}
-		}
-	}
-
-void SERIAL_Init (Section * sec)
-	{
-	Section_prop *section = static_cast <Section_prop*>(sec);
 	char sname[] = "COMx";
 	// iterate through first 4 com ports and the rest (COM5-9)
 	for (Bitu i = 0; i < 9; i++)
 		{
 		sname[3] = '1' + i;
-		dosdevices[i] = new device_PRT(sname, section->Get_string(sname));
+		dosdevices[i] = new device_PRT(sname, ConfGetString(sname));
 		DOS_AddDevice(dosdevices[i]);
 		if (i < 4)
 			serialPorts[i] = new CSerial(i, dosdevices[i]);

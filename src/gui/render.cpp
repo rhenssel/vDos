@@ -1,20 +1,16 @@
-#include <sys/types.h>
-
 #include "vDos.h"
 #include "video.h"
 #include "render.h"
 #include "wchar.h"
-
 #include "..\..\SDL-1.2.15\include\SDL_syswm.h"
-#include "windows.h"
 
 Render_t render;
 ScalerLineHandler_t RENDER_DrawLine;
 
 Bit8u rendererCache[RENDER_MAXHEIGHT * RENDER_MAXWIDTH];
 
-Bit16u curAttrChar[txtMaxLins*txtMaxCols];					// currently displayed textpage
-Bit16u newAttrChar[txtMaxLins*txtMaxCols];					// to be replaced by
+Bit16u curAttrChar[txtMaxLins*txtMaxCols];											// Current displayed textpage
+Bit16u *newAttrChar;																// To be replaced by
 
 void SimpleRenderer(const void *s)
 	{
@@ -85,14 +81,13 @@ bool RENDER_StartUpdate(void)
 		return false;
 
 	render.cache.pointer = (Bit8u*)&rendererCache;
-
 	render.cache.start_x = render.cache.width;
 	render.cache.past_x = render.cache.width;
 	render.cache.start_y = 0;
 	render.cache.past_y = 0;
 	render.cache.curr_y = 0;
 
-	if (render.cache.nextInvalid)		// Always do a full screen update
+	if (render.cache.nextInvalid)													// Always do a full screen update
 		{
 		render.cache.nextInvalid = false;
 		render.cache.invalid = true;
@@ -127,13 +122,11 @@ void RENDER_EndUpdate()
 
 void RENDER_Reset(void)
 	{
-	// Setup the scaler variables
-	GFX_SetSize(render.cache.width, render.cache.height);
+	GFX_SetSize(render.cache.width, render.cache.height);							// Setup the scaler variables
 
-	// Finish this frame using a copy only handler
-	RENDER_DrawLine = RENDER_FinishLineHandler;
-	// Signal the next frame to first reinit the cache
-	render.cache.nextInvalid = true;
+	RENDER_DrawLine = RENDER_FinishLineHandler;										// Finish this frame using a copy only handler
+	
+	render.cache.nextInvalid = true;												// Signal the next frame to first reinit the cache
 	render.active = true;
 	}
 
@@ -144,11 +137,10 @@ void RENDER_SetSize(Bitu width, Bitu height)
 		return;
 	render.cache.width	= width;
 	render.cache.height	= height;
-
 	RENDER_Reset();
 	}
 
-void RENDER_Init(Section * sec)
+void RENDER_Init()
 	{
 	render.updating = true;
 	}

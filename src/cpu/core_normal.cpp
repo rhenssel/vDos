@@ -27,8 +27,8 @@
 #define TEST_PREFIX_REP		(core.prefixes & PREFIX_REP)
 
 #define DO_PREFIX_SEG(_SEG)					\
-	BaseDS=SegBase(_SEG);					\
-	BaseSS=SegBase(_SEG);					\
+	BaseDS = SegBase(_SEG);					\
+	BaseSS = SegBase(_SEG);					\
 	core.base_val_ds = _SEG;				\
 	goto restart_opcode;
 
@@ -65,21 +65,21 @@ static struct {
 #define BaseDS		core.base_ds
 #define BaseSS		core.base_ss
 
-static INLINE Bit8u Fetchb()
+static inline Bit8u Fetchb()
 	{
 	Bit8u temp = vPC_rLodsb(core.cseip);
 	core.cseip += 1;
 	return temp;
 	}
 
-static INLINE Bit16u Fetchw()
+static inline Bit16u Fetchw()
 	{
 	Bit16u temp = vPC_rLodsw(core.cseip);
 	core.cseip += 2;
 	return temp;
 	}
 
-static INLINE Bit32u Fetchd()
+static inline Bit32u Fetchd()
 	{
 	Bit32u temp = vPC_rLodsd(core.cseip);
 	core.cseip += 4;
@@ -131,6 +131,7 @@ decode_end:
 	return CBRET_NONE;
 	}
 
+// Mainly for debuggers
 Bits CPU_Core_Normal_Trap_Run(void)
 	{
 	Bits oldCycles = CPU_Cycles;
@@ -143,5 +144,16 @@ Bits CPU_Core_Normal_Trap_Run(void)
 	CPU_Cycles = oldCycles-1;
 	cpudecoder = &CPU_Core_Normal_Run;
 
+	return ret;
+	}
+
+Bits PageFaultCore(void)
+	{
+	CPU_CycleLeft += CPU_Cycles;
+	CPU_Cycles = 1;
+	Bits ret = CPU_Core_Normal_Run();
+	CPU_CycleLeft += CPU_Cycles;
+	if (ret<0)
+		E_Exit("Got a vDos close machine in pagefault core?");
 	return ret;
 	}

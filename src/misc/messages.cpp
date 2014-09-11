@@ -3,12 +3,9 @@
 #include <string.h>
 #include "vDos.h"
 #include "support.h"
-#include "setup.h"
 #include <list>
 #include <string>
 using namespace std;
-
-#define LINE_IN_MAXLEN 2048
 
 struct MessageBlock {
 	string name;
@@ -35,7 +32,6 @@ static void MSG_Replace(const char * _name, const char* _val)
 			}
 	}
 
-
 static void LoadMessageFile(void)
 	{
 	FILE * mfile;
@@ -49,47 +45,37 @@ static void LoadMessageFile(void)
 			return;
 		}
 
-	char linein[LINE_IN_MAXLEN];
-	char name[LINE_IN_MAXLEN];
-	char string[LINE_IN_MAXLEN*10];
-	// Start out with empty strings
-	name[0] = 0;
+	char *linein = (char *)tempBuff2K;
+	char *name = (char *)tempBuff1K;
+	char *string = (char *)tempBuff4K;
+	
+	name[0] = 0;														// Start out with empty strings
 	string[0] = 0;
-	while (fgets(linein, LINE_IN_MAXLEN, mfile))
+	while (fgets(linein, 2048, mfile))									// Parse the read line
 		{
-		// Parse the read line
-		// First remove characters 10 and 13 from the line
 		char * parser = linein;
 		char * writer = linein;
-		while (*parser)
+		while (*parser)													// First remove characters 10 and 13 from the line
 			{
 			if (*parser != 10 && *parser != 13)
 				*writer++ = *parser;
 			*parser++;
 			}
 		*writer = 0;
-		// New string name
-		if (linein[0] == ':')
+		if (linein[0] == ':')											// New string name
 			{
-			string[0] = 0;
+			string[0] = 0;												// End of string marker
 			strcpy(name, linein+1);
-			// End of string marker
 			}
-		else if (linein[0] == '.')
+		else if (linein[0] == '.')										// Replace/Add the string to the internal langaugefile
 			{
-			// Replace/Add the string to the internal langaugefile
-			// Remove last newline (marker is \n.\n)
 			size_t ll = strlen(string);
-			if (ll && string[ll - 1] == '\n')
-				string[ll - 1] = 0;		// Second if should not be needed, but better be safe.
+			if (ll && string[ll - 1] == '\n')							// Remove last newline (marker is \n)
+				string[ll - 1] = 0;										// Second if should not be needed, but better be safe.
 			MSG_Replace(name, string);
 			}
-		else
-			{
-			// Normal string to be added
-			strcat(string, linein);
-			strcat(string, "\n");
-			}
+		else															// Normal string to be added
+			strcat(strcat(string, linein), "\n");
 		}
 	fclose(mfile);
 	}
@@ -170,10 +156,12 @@ void MSG_Init()
 	MSG_Add("VER?",					"Displays or sets the reported DOS version.\n\n"
 									"VER [major minor]\n");
 
-	MSG_Add("MEM:CONVEN",				"\n%5dK free conventional memory\n");
-	MSG_Add("MEM:EXTEND",				"%5dK free extended memory\n");
-	MSG_Add("MEM:UPPER1",				"%5dK free upper memory\n");
-	MSG_Add("MEM:UPPER2",				"%5dK free upper memory in %d blocks, largest: %dK\n");
+	MSG_Add("MEM:INTRO",				"\n  Free memory:\n");
+	MSG_Add("MEM:CONVEN",				"%5dK Conventional\n");
+	MSG_Add("MEM:XMS",					"%5dK XMS\n");
+	MSG_Add("MEM:EMS",					"%5dK EMS\n");
+	MSG_Add("MEM:UPPER1",				"%5dK Upper\n");
+	MSG_Add("MEM:UPPER2",				"%5dK Upper in %d blocks, largest: %dK\n");
 	MSG_Add("USE:MOUNTED",				"\n      Windows directory\n");
 	MSG_Add("USE:NODIR",				"Directory %s doesn't exist\n");
 	MSG_Add("USE:ALREADY_USED",			"%c: is already used\n");

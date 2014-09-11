@@ -1,14 +1,8 @@
 #include <stdlib.h>
-#include <stdarg.h>
-#include <string.h>
 #include "vDos.h"
 #include "regs.h"
-#include "control.h"
 #include "shell.h"
 #include "callback.h"
-#include "support.h"
-
-#include "mouse.h"
 
 Bitu call_shellstop;
 /* Larger scope so shell_del autoexec can use it to
@@ -70,7 +64,7 @@ Bitu DOS_Shell::GetRedirection(char *s, char **ifn, char **ofn, bool * append)
 			*append = ((*lr) == '>');
 			if (*append)
 				lr++;
-			lr = ltrim(lr);
+			lr = lTrim(lr);
 			if (*ofn)
 				free(*ofn);
 			*ofn = lr;
@@ -90,7 +84,7 @@ Bitu DOS_Shell::GetRedirection(char *s, char **ifn, char **ofn, bool * append)
 		case '<':
 			if (*ifn)
 				free(*ifn);
-			lr = ltrim(lr);
+			lr = lTrim(lr);
 			*ifn = lr;
 			while (*lr && *lr != ' ' && *lr != '>' && *lr != '|')
 				lr++;
@@ -116,12 +110,13 @@ Bitu DOS_Shell::GetRedirection(char *s, char **ifn, char **ofn, bool * append)
 
 void DOS_Shell::ParseLine(char * line)
 	{
-	line = trim(line);
+	line = lrTrim(line);
 
- 	if (bf && line[0] == '@')						// Check for a leading '@' in batchfile
-		line = ltrim(++line);
-//	if (!strnicmp(line, "rem ", 4))
-//		return;
+ 	if (bf && line[0] == '@')											// Check for a leading '@' in batchfile
+		line = lTrim(++line);
+
+	if (!strlen(line) || (!strnicmp(line, "rem", 3) && (line[3] == 0 || line[3] == 32 || line[3] == 9)))	// Filter out rem ...
+		return;
 
 	// Do redirection and pipe checks
 	char * in  = 0;
@@ -129,11 +124,11 @@ void DOS_Shell::ParseLine(char * line)
 
 	Bit16u dummy, dummy2;
 	Bit32u bigdummy = 0;
-	Bitu num = 0;									// Number of commands in this line
+	Bitu num = 0;														// Number of commands in this line
 	bool append;
-	bool normalstdin  = false;						// wether stdin/out are open on start
-	bool normalstdout = false;						// Bug: Assumed is they are "con"
-	
+	bool normalstdin  = false;											// Wether stdin/out are open on start
+	bool normalstdout = false;											// Bug: Assumed is they are "con"
+
 	num = GetRedirection(line, &in, &out, &append);
 	if (in || out)
 		{
@@ -141,12 +136,12 @@ void DOS_Shell::ParseLine(char * line)
 		normalstdout = (psp->GetFileHandle(1) != 0xff); 
 		}
 	if (in)
-		if (DOS_OpenFile(in, OPEN_READ, &dummy))	// Test if file can be opened for reading
+		if (DOS_OpenFile(in, OPEN_READ, &dummy))						// Test if file can be opened for reading
 			{
 			DOS_CloseFile(dummy);
 			if (normalstdin)
-				DOS_CloseFile(0);					// Close stdin
-			DOS_OpenFile(in, OPEN_READ, &dummy);	// Open new stdin
+				DOS_CloseFile(0);										// Close stdin
+			DOS_OpenFile(in, OPEN_READ, &dummy);						// Open new stdin
 			}
 	if (out)
 		{
@@ -155,26 +150,26 @@ void DOS_Shell::ParseLine(char * line)
 		if (!normalstdin && !in)
 			DOS_OpenFile("con", OPEN_READWRITE, &dummy);
 		bool status = true;
-		// Create if not exist. Open if exist. Both in read/write mode
-		if (append)
+		
+		if (append)														// Create if not exist. Open if exist. Both in read/write mode
 			{
 			if (status = DOS_OpenFile(out, OPEN_READWRITE, &dummy))
 				DOS_SeekFile(1, &bigdummy, DOS_SEEK_END);
 			else
-				status = DOS_CreateFile(out, DOS_ATTR_ARCHIVE, &dummy);	//Create if not exists.
+				status = DOS_CreateFile(out, DOS_ATTR_ARCHIVE, &dummy);	// Create if not exists.
 			}
 		else
 			status = DOS_OpenFileExtended(out, OPEN_READWRITE, DOS_ATTR_ARCHIVE, 0x12, &dummy, &dummy2);
 
 		if (!status && normalstdout)
-			DOS_OpenFile("con", OPEN_READWRITE, &dummy);	// Read only file, open con again
+			DOS_OpenFile("con", OPEN_READWRITE, &dummy);				// Read only file, open con again
 		if (!normalstdin && !in)
 			DOS_CloseFile(0);
 		}
 
-	DoCommand(line);	// Run the actual command
-	// Restore handles
-	if (in)
+	DoCommand(line);													// Run the actual command
+	
+	if (in)																// Restore handles
 		{
 		DOS_CloseFile(0);
 		if (normalstdin)
@@ -215,22 +210,17 @@ void DOS_Shell::Run(void)
 	char input_line[CMD_MAXLINE] = {0};
 	std::string line;
 
-	if (cmd->FindStringRemain("/C", line) || cmd->FindStringBegin("/C", line, false) || cmd->FindStringBegin("/c", line, false))
+	if (cmd->GetCommand(line))
 		{
 		strcpy(input_line, line.c_str());
 		DOS_Shell temp;
 		temp.echo = echo;
-		temp.ParseLine(input_line);		// for *.exe *.com  |*.bat creates the bf needed by runinternal;
-		temp.RunInternal();				// exits when no bf is found.
+		temp.ParseLine(input_line);										// For *.exe *.com  |*.bat creates the bf needed by runinternal;
+		temp.RunInternal();												// Exits when no bf is found.
 		return;
 		}
-	// Start a normal shell and check for a first command init
-	if (cmd->FindString("/INIT", line, true))
-		{
-		strcpy(input_line, line.c_str());
-		line.erase();
-		ParseLine(input_line);
-		}
+	if (cmd->FirstStart())												// Start a normal shell and check for a first command init// Start a normal shell and check for a first command init
+		ParseLine(strcpy(input_line, "AUTOEXEC.BAT"));
 	do
 		{
 		if (bf)
@@ -241,7 +231,6 @@ void DOS_Shell::Run(void)
 					{
 					ShowPrompt();
 					WriteOut_NoParsing(input_line);
-					WriteOut("\n");
 					}
 				ParseLine(input_line);
 				if (echo)
@@ -254,9 +243,9 @@ void DOS_Shell::Run(void)
 				ShowPrompt();
 			InputCommand(input_line);
 			char * content = input_line;
-			while (*content == ' ' || *content == '\t')			// strip leading spaces
+			while (*content == ' ' || *content == '\t')					// Strip leading spaces
 				content++;
-			if (*content)										// If not empty
+			if (*content)												// If not empty
 				{
 				ParseLine(content);
 				if (echo && !bf)
@@ -269,19 +258,18 @@ void DOS_Shell::Run(void)
 
 char * init_line = "";
 
-void AUTOEXEC_Init(Section * sec)
+void AUTOEXEC_Init()
 	{
 	FILE * aef = fopen("autoexec.txt", "rb");
 	if (aef)
 		{
 		int fsize = _filelength(_fileno(aef));
-		if (fsize > 0 && fsize < 4096)							// just ignore if greater than 4K (probably something else)
+		if (fsize > 0 && fsize < 4096)									// Just ignore if greater than 4K (probably something else)
 			{
-			void * aedata = malloc(fsize);						// MEM LEAK, so what?
-			fread(aedata, 1, fsize, aef);
+			fread((void *)tempBuff4K, 1, fsize, aef);
 			fclose(aef);
-			VFILE_Register("AUTOEXEC.BAT", (Bit8u *)aedata, (Bit16u)fsize);
-			init_line = "/INIT AUTOEXEC.BAT";
+			VFILE_Register("AUTOEXEC.BAT", (Bit8u *)tempBuff4K, (Bit16u)fsize);
+			init_line = "/INIT";
 			return;
 			}
 		fclose(aef);
@@ -362,6 +350,4 @@ void SHELL_Init()
 	
 	SHELL_ProgramStart(&first_shell);
 	first_shell->Run();
-	delete first_shell;
-	first_shell = 0;		// Make clear that it shouldn't be used anymore
 	}

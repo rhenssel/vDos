@@ -13,7 +13,6 @@
 #endif
 
 
-#include "control.h"
 #include "dos_inc.h"
 #include <vector>
 

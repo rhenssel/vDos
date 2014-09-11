@@ -48,16 +48,19 @@ int Unicode2Ascii(Bit16u *unicode, Bit8u *ascii, int maxLength)		// Unicode is e
 			if (unicode[1] == 10)									// Linefeed, but that should always come after return
 				unicode++;
 			}
-		else														// try to translate to ASCII > 0x7e
-			{														// so ASCII 0-31 are dropped, don't make sense for text pasting?
-			ascii[translated] = 127;								// Untranslated become underscores
-			for (int j = 0x7f; j < 256; j++)						// slow, in time based upon a table?
+		else														// Try to translate remaining Unicode values to ASCII
+			{														// So Unicode = ASCII 0-31 are dropped, doesn't make sense for text pasting?
+			bool done = false;
+			for (int j = 0x7f; j < 256; j++)						// Slow, but not important 
 				if (*unicode == cpMap[j])
 					{
-					ascii[translated++] = j;
+					ascii[translated] = j;
+					done = true;
 					break;
 					}
-			translated--;
+			if (!done)												// If no match found, let Windows try to substitute
+				if (WideCharToMultiByte(CP_OEMCP, 0, (LPCWSTR)unicode, 1, (LPSTR)(ascii+translated), 1, "\x7f", NULL) != 1 || ascii[translated] > 127)
+					ascii[translated] = 127;						// Overkill? But we certainly don't want an ANSI > 127 as ASCII, WideCharToMultiByte() converts to ANSI
 			}
 		unicode++;
 		}
@@ -76,26 +79,32 @@ void lowcase(std::string &str)
 	std::transform(str.begin(), str.end(), str.begin(), tf);
 	}
  
-//	Ripped some source from freedos for this one.
-char *ltrim(char *str)
+char *lTrim(char *str)
 	{ 
 	while (isspace(*str))
 		str++;
 	return str;
 	}
 
-char *rtrim(char *str)
+char *rTrim(char *str)
 	{
-	char *p;
-	p = strchr(str, '\0');
+	char *p = strchr(str, '\0');
 	while (--p >= str && isspace(*p)) {};
-	p[1] = '\0';
+	p[1] = 0;
 	return str;
 	}
 
-char *trim(char *str)
+char *rSpTrim(char *str)
 	{
-	return ltrim(rtrim(str));
+	char *p = strchr(str, '\0');
+	while (--p >= str && *p == 32) {};
+	p[1] = 0;
+	return str;
+	}
+
+char *lrTrim(char *str)
+	{
+	return lTrim(rTrim(str));
 	}
 
 char * upcase(char * str)
@@ -118,13 +127,11 @@ bool ScanCMDBool(char * cmd, char const * const check)
 	size_t c_len = strlen(check);
 	while ((scan = strchr(scan, '/')))
 		{
-		// found a / now see behind it
-		scan++;
+		scan++;															// found a / now see behind it
 		if (strnicmp(scan, check, c_len) == 0 && (scan[c_len] == ' ' || scan[c_len] == '\t' || scan[c_len]== '/' || scan[c_len] == 0))
 			{
-			// Found a math now remove it from the string
-			memmove(scan-1, scan+c_len, strlen(scan+c_len)+1);
-			trim(scan-1);
+			memmove(scan-1, scan+c_len, strlen(scan+c_len)+1);			// Found a math now remove it from the string
+			lrTrim(scan-1);
 			return true;
 			}
 		}
@@ -142,18 +149,17 @@ char * ScanCMDRemain(char * cmd)
 		*scan = 0;
 		return found;
 		}
-	else
-		return 0; 
+	return NULL; 
 	}
 
 char * StripWord(char *&line)
 	{
-	char * scan = ltrim(line);
+	char * scan = lTrim(line);
 	if (*scan == '"')
 		if (char * end_quote = strchr(++scan, '"'))
 			{
 			*end_quote = 0;
-			line = ltrim(++end_quote);
+			line = lTrim(++end_quote);
 			return scan;
 			}
 	char * begin = scan;

@@ -6,15 +6,14 @@
 #include "paging.h"
 #include "pic.h"
 #include "inout.h"
-#include "setup.h"
 #include "cpu.h"
 
-#define CHECKED(v) ((v)&(vga.vmemwrap-1))			// Checked linear offset
-#define CHECKED2(v) ((v)&((vga.vmemwrap>>2)-1))		// Checked planar offset (latched access)
+#define CHECKED(v) ((v)&(vga.vmemwrap-1))											// Checked linear offset
+#define CHECKED2(v) ((v)&((vga.vmemwrap>>2)-1))										// Checked planar offset (latched access)
 #define CHECKED3(v) ((v)&(vga.vmemwrap-1))
 
 template <class Size>
-static INLINE void hostWrite(HostPt off, Bitu val)
+static inline void hostWrite(HostPt off, Bitu val)
 	{
 	if (sizeof(Size) == 1)
 		*(Bit8u *)(off) = (Bit8u)val;
@@ -25,7 +24,7 @@ static INLINE void hostWrite(HostPt off, Bitu val)
 	}
 
 template <class Size>
-static INLINE Bitu hostRead(HostPt off)
+static inline Bitu hostRead(HostPt off)
 	{
 	if (sizeof(Size) == 1)
 		return *(Bit8u *)off;
@@ -36,18 +35,17 @@ static INLINE Bitu hostRead(HostPt off)
 	return 0;
 	}
 
-// Nice one from DosEmu
 static Bit32u RasterOp(Bit32u input, Bit32u mask)
 	{
 	switch (vga.config.raster_op)
 		{
-	case 0:		// None
+	case 0:																			// None
 		return (input & mask) | (vga.latch.d & ~mask);
-	case 1:		// AND
+	case 1:																			// AND
 		return (input | ~mask) & vga.latch.d;
-	case 2:		// OR
+	case 2:																			// OR
 		return (input & mask) | vga.latch.d;
-	case 3:		// XOR
+	case 3:																			// XOR
 		return (input & mask) ^ vga.latch.d;
 		};
 	return 0;
@@ -81,9 +79,9 @@ static Bit32u ModeOperation(Bit8u val)
 	}
 
 // Gonna assume that whoever maps vga memory, maps it on 32/64kb boundary
-#define VGA_PAGE_A0		(0xA0000/4096)
-#define VGA_PAGE_B0		(0xB0000/4096)
-#define VGA_PAGE_B8		(0xB8000/4096)
+#define VGA_PAGE_A0		(0xA0000/MEM_PAGESIZE)
+#define VGA_PAGE_B0		(0xB0000/MEM_PAGESIZE)
+#define VGA_PAGE_B8		(0xB8000/MEM_PAGESIZE)
 
 static struct {
 	Bitu base, mask;
@@ -92,7 +90,7 @@ static struct {
 class VGA_UnchainedRead_Handler : public PageHandler
 	{
 public:
-	Bitu readHandler(PhysPt start)
+	Bit8u readHandler(PhysPt start)
 		{
 		vga.latch.d = ((Bit32u*)vga.mem.linear)[start];
 		switch (vga.config.read_mode)
@@ -107,17 +105,17 @@ public:
 		return 0;
 		}
 public:
-	Bitu readb(PhysPt addr)
+	Bit8u readb(PhysPt addr)
 		{
 		addr = CHECKED2(addr & vgapages.mask);
 		return readHandler(addr);
 		}
-	Bitu readw(PhysPt addr)
+	Bit16u readw(PhysPt addr)
 		{
 		addr = CHECKED2(addr & vgapages.mask);
 		return (readHandler(addr+0) << 0) | (readHandler(addr+1) << 8);
 		}
-	Bitu readd(PhysPt addr)
+	Bit32u readd(PhysPt addr)
 		{
 		addr = CHECKED2(addr & vgapages.mask);
 		return (readHandler(addr+0) << 0) | (readHandler(addr+1) << 8) | (readHandler(addr+2) << 16) | (readHandler(addr+3) << 24);
@@ -155,18 +153,18 @@ public:
 		{
 		flags = PFLAG_NOCODE;
 		}
-	void writeb(PhysPt addr, Bitu val)
+	void writeb(PhysPt addr, Bit8u val)
 		{
 		addr = CHECKED(addr & vgapages.mask);
 		writeHandler(addr+0, (Bit8u)(val >> 0));
 		}
-	void writew(PhysPt addr, Bitu val)
+	void writew(PhysPt addr, Bit16u val)
 		{
 		addr = CHECKED(addr & vgapages.mask);
 		writeHandler(addr+0, (Bit8u)(val >> 0));
 		writeHandler(addr+1, (Bit8u)(val >> 8));
 		}
-	void writed(PhysPt addr, Bitu val)
+	void writed(PhysPt addr, Bit32u val)
 		{
 		addr = CHECKED(addr & vgapages.mask);
 		writeHandler(addr+0, (Bit8u)(val >> 0));
@@ -174,17 +172,17 @@ public:
 		writeHandler(addr+2, (Bit8u)(val >> 16));
 		writeHandler(addr+3, (Bit8u)(val >> 24));
 		}
-	Bitu readb(PhysPt addr)
+	Bit8u readb(PhysPt addr)
 		{
 		addr = CHECKED(addr & vgapages.mask);
 		return readHandler(addr);
 		}
-	Bitu readw(PhysPt addr)
+	Bit16u readw(PhysPt addr)
 		{
 		addr = CHECKED(addr & vgapages.mask);
 		return (readHandler(addr+0) << 0) | (readHandler(addr+1) << 8);
 		}
-	Bitu readd(PhysPt addr)
+	Bit32u readd(PhysPt addr)
 		{
 		addr = CHECKED(addr & vgapages.mask);
 		return (readHandler(addr+0) << 0) | (readHandler(addr+1) << 8) | (readHandler(addr+2) << 16) | (readHandler(addr+3) << 24);
@@ -219,18 +217,18 @@ public:
 		{
 		flags = PFLAG_NOCODE;
 		}
-	void writeb(PhysPt addr, Bitu val)
+	void writeb(PhysPt addr, Bit8u val)
 		{
 		addr = CHECKED2(addr & vgapages.mask);
 		writeHandler(addr+0, (Bit8u)(val >> 0));
 		}
-	void writew(PhysPt addr, Bitu val)
+	void writew(PhysPt addr, Bit16u val)
 		{
 		addr = CHECKED2(addr & vgapages.mask);
 		writeHandler(addr+0, (Bit8u)(val >> 0));
 		writeHandler(addr+1, (Bit8u)(val >> 8));
 		}
-	void writed(PhysPt addr, Bitu val)
+	void writed(PhysPt addr, Bit32u val)
 		{
 		addr = CHECKED2(addr & vgapages.mask);
 		writeHandler(addr+0, (Bit8u)(val >> 0));
@@ -249,72 +247,72 @@ public:
 		flags = PFLAG_NOCODE;
 		}
 	template <class Size>
-	static INLINE Bitu readHandler(PhysPt addr)
+	static inline Bitu readHandler(PhysPt addr)
 		{
 		return hostRead<Size>(&vga.mem.linear[((addr&~3)<<2)+(addr&3)]);
 		}
 	template <class Size>
-	static INLINE void writeCache(PhysPt addr, Bitu val)
+	static inline void writeCache(PhysPt addr, Bitu val)
 		{
 		hostWrite<Size>(&vga.fastmem[addr], val);
 		if (addr < 320)		// And replicate the first line
 			hostWrite<Size>(&vga.fastmem[addr+64*1024], val);
 		}
 	template <class Size>
-	static INLINE void writeHandler(PhysPt addr, Bitu val)
+	static inline void writeHandler(PhysPt addr, Bitu val)
 		{
 		// No need to check for compatible chains here, this one is only enabled if that bit is set
 		hostWrite<Size>(&vga.mem.linear[((addr&~3)<<2)+(addr&3)], val);
 		}
-	Bitu readb(PhysPt addr)
+	Bit8u readb(PhysPt addr)
 		{
 		addr = CHECKED(addr & vgapages.mask);
 		return readHandler<Bit8u>(addr);
 		}
-	Bitu readw(PhysPt addr)
+	Bit16u readw(PhysPt addr)
 		{
 		addr = CHECKED(addr & vgapages.mask);
 		if (addr & 1)
-			return (readHandler<Bit8u>( addr+0 ) << 0) | (readHandler<Bit8u>( addr+1 ) << 8);
+			return (readHandler<Bit8u>(addr+0)<<0) | (readHandler<Bit8u>(addr+1)<<8);
 		return readHandler<Bit16u>(addr);
 		}
-	Bitu readd(PhysPt addr)
+	Bit32u readd(PhysPt addr)
 		{
 		addr = CHECKED(addr & vgapages.mask);
 		if (addr & 3)
-			return (readHandler<Bit8u>(addr+0) << 0) | (readHandler<Bit8u>(addr+1) << 8) | (readHandler<Bit8u>(addr+2) << 16) | (readHandler<Bit8u>(addr+3) << 24);
+			return (readHandler<Bit8u>(addr+0)<<0) | (readHandler<Bit8u>(addr+1)<<8) | (readHandler<Bit8u>(addr+2)<<16) | (readHandler<Bit8u>(addr+3)<<24);
 		return readHandler<Bit32u>(addr);
 		}
-	void writeb(PhysPt addr, Bitu val)
+	void writeb(PhysPt addr, Bit8u val)
 		{
 		addr = CHECKED(addr & vgapages.mask);
 		writeHandler<Bit8u>(addr, val);
 		writeCache<Bit8u>(addr, val);
 		}
-	void writew(PhysPt addr,Bitu val)
+	void writew(PhysPt addr, Bit16u val)
 		{
 		addr = CHECKED(addr & vgapages.mask);
 		if (addr & 1)
 			{
-			writeHandler<Bit8u>(addr+0, val >> 0);
-			writeHandler<Bit8u>(addr+1, val >> 8);
+			writeHandler<Bit8u>(addr+0, val>>0);
+			writeHandler<Bit8u>(addr+1, val>>8);
 			}
 		else
 			writeHandler<Bit16u>(addr, val);
 		writeCache<Bit16u>(addr, val);
 		}
-	void writed(PhysPt addr,Bitu val)
+	void writed(PhysPt addr, Bit32u val)
 		{
 		addr = CHECKED(addr & vgapages.mask);
 		if (addr & 3)
 			{
-			writeHandler<Bit8u>(addr+0, val >> 0);
-			writeHandler<Bit8u>(addr+1, val >> 8);
-			writeHandler<Bit8u>(addr+2, val >> 16);
-			writeHandler<Bit8u>(addr+3, val >> 24);
+			writeHandler<Bit8u>(addr+0, val>>0);
+			writeHandler<Bit8u>(addr+1, val>>8);
+			writeHandler<Bit8u>(addr+2, val>>16);
+			writeHandler<Bit8u>(addr+3, val>>24);
 			}
 		else
-			writeHandler<Bit32u>( addr, val );
+			writeHandler<Bit32u>(addr, val);
 		writeCache<Bit32u>(addr, val);
 		}
 	};
@@ -330,32 +328,30 @@ public:
 		pixels.d &= vga.config.full_not_map_mask;
 		pixels.d |= (data & vga.config.full_map_mask);
 		((Bit32u*)vga.mem.linear)[addr] = pixels.d;
-//		if(vga.config.compatible_chain4)
-//			((Bit32u*)vga.mem.linear)[CHECKED2(addr+64*1024)]=pixels.d; 
 		}
 public:
 	VGA_UnchainedVGA_Handler()
 		{
 		flags = PFLAG_NOCODE;
 		}
-	void writeb(PhysPt addr, Bitu val)
+	void writeb(PhysPt addr, Bit8u val)
 		{
 		addr = CHECKED2(addr & vgapages.mask);
 		writeHandler(addr+0, (Bit8u)(val >> 0));
 		}
-	void writew(PhysPt addr, Bitu val)
+	void writew(PhysPt addr, Bit16u val)
 		{
 		addr = CHECKED2(addr & vgapages.mask);
-		writeHandler(addr+0, (Bit8u)(val >> 0));
-		writeHandler(addr+1, (Bit8u)(val >> 8));
+		writeHandler(addr+0, (Bit8u)(val>>0));
+		writeHandler(addr+1, (Bit8u)(val>>8));
 		}
-	void writed(PhysPt addr, Bitu val)
+	void writed(PhysPt addr, Bit32u val)
 		{
 		addr = CHECKED2(addr & vgapages.mask);
-		writeHandler(addr+0, (Bit8u)(val >> 0));
-		writeHandler(addr+1, (Bit8u)(val >> 8));
-		writeHandler(addr+2, (Bit8u)(val >> 16));
-		writeHandler(addr+3, (Bit8u)(val >> 24));
+		writeHandler(addr+0, (Bit8u)(val>>0));
+		writeHandler(addr+1, (Bit8u)(val>>8));
+		writeHandler(addr+2, (Bit8u)(val>>16));
+		writeHandler(addr+3, (Bit8u)(val>>24));
 		}
 	};
 
@@ -367,11 +363,11 @@ public:
 		{
 		flags = PFLAG_NOCODE;
 		}
-	Bitu readb(PhysPt addr)
+	Bit8u readb(PhysPt addr)
 		{
 		return vga.draw.font[addr & vgapages.mask];
 		}
-	void writeb(PhysPt addr,Bitu val)
+	void writeb(PhysPt addr, Bit8u val)
 		{
 		if (vga.seq.map_mask & 0x4)
 			vga.draw.font[addr & vgapages.mask] = (Bit8u)val;
@@ -385,15 +381,9 @@ public:
 		{
 		flags = PFLAG_READABLE|PFLAG_WRITEABLE|PFLAG_NOCODE;
 		}
-	HostPt GetHostReadPt(Bitu phys_page)
+	HostPt GetHostPt(PhysPt addr)
 		{
- 		phys_page -= vgapages.base;
-		return &vga.mem.linear[CHECKED3(phys_page*4096)];
-		}
-	HostPt GetHostWritePt(Bitu phys_page)
-		{
- 		phys_page -= vgapages.base;
-		return &vga.mem.linear[CHECKED3(phys_page*4096)];
+		return &vga.mem.linear[addr&0x7fff];
 		}
 	};
 
@@ -410,12 +400,10 @@ void VGA_SetupHandlers(void)
 	{
 	PageHandler *newHandler;
 
-	// This should be vga only
-	switch (vga.mode)
+	switch (vga.mode)																// This should be vga only
 		{
 	case M_TEXT:
-		// Check if we're not in odd/even mode
-		if (vga.gfx.miscellaneous & 0x2)
+		if (vga.gfx.miscellaneous & 0x2)											// Check if we're not in odd/even mode
 			newHandler = &vgaph.map;
 		else
 			newHandler = &vgaph.text;
@@ -432,10 +420,6 @@ void VGA_SetupHandlers(void)
 		else
 			newHandler = &vgaph.uega;
 		break;	
-	case M_CGA4:
-	case M_CGA2:
-		newHandler = &vgaph.map;
-		break;
 	default:
 		return;
 		}
@@ -444,48 +428,36 @@ void VGA_SetupHandlers(void)
 	case 0:
 		vgapages.base = VGA_PAGE_A0;
 		vgapages.mask = 0x1ffff;
-		MEM_SetPageHandler(VGA_PAGE_A0, 32, newHandler);
+		MEM_SetPageHandler(VGA_PAGE_A0, 128*1024/MEM_PAGESIZE, newHandler);
 		break;
 	case 1:
 		vgapages.base = VGA_PAGE_A0;
 		vgapages.mask = 0xffff;
-		MEM_SetPageHandler(VGA_PAGE_A0, 16, newHandler);
-		MEM_ResetPageHandler(VGA_PAGE_B0, 16);
+		MEM_SetPageHandler(VGA_PAGE_A0, 64*1024/MEM_PAGESIZE, newHandler);
+		MEM_ResetPageHandler(VGA_PAGE_B0, 64*1024/MEM_PAGESIZE);
 		break;
 	case 2:
 		vgapages.base = VGA_PAGE_B0;
 		vgapages.mask = 0x7fff;
-		MEM_SetPageHandler(VGA_PAGE_B0, 8, newHandler);
-		MEM_ResetPageHandler(VGA_PAGE_A0, 16);
-		MEM_ResetPageHandler(VGA_PAGE_B8, 8);
+		MEM_SetPageHandler(VGA_PAGE_B0, 32*1024/MEM_PAGESIZE, newHandler);
+		MEM_ResetPageHandler(VGA_PAGE_A0, 64*1024/MEM_PAGESIZE);
+		MEM_ResetPageHandler(VGA_PAGE_B8, 32*1024/MEM_PAGESIZE);
 		break;
 	case 3:
 		vgapages.base = VGA_PAGE_B8;
 		vgapages.mask = 0x7fff;
-		MEM_SetPageHandler(VGA_PAGE_B8, 8, newHandler);
-		MEM_ResetPageHandler(VGA_PAGE_A0, 16);
-		MEM_ResetPageHandler(VGA_PAGE_B0, 8);
+		MEM_SetPageHandler(VGA_PAGE_B8, 32*1024/MEM_PAGESIZE, newHandler);
+		MEM_ResetPageHandler(VGA_PAGE_A0, 64*1024/MEM_PAGESIZE);
+		MEM_ResetPageHandler(VGA_PAGE_B0, 32*1024/MEM_PAGESIZE);
 		break;
 		}
 	}
 
-static void VGA_Memory_ShutDown(Section * /*sec*/)
+void VGA_SetupMemory()
 	{
-	delete[] vga.mem.linear_orgptr;
-	delete[] vga.fastmem_orgptr;
-	}
-
-void VGA_SetupMemory(Section* sec)
-	{
-	Bit32u vga_allocsize = 512*1024;			// Keep lower limit at 512k
-/*		
-	Bit32u vga_allocsize = vga.vmemsize;
-	// Keep lower limit at 512k
-	if (vga_allocsize < 512*1024)
-		vga_allocsize = 512*1024;
-*/	
-	vga_allocsize += 4096 * 4;					// We reserve an extra scan line (max S3 scanline 4096)
-	vga_allocsize += 16;						// for memory alignment	
+	Bit32u vga_allocsize = 512*1024;												// Keep lower limit at 512k
+	vga_allocsize += 4096 * 4;														// We reserve an extra scan line (max S3 scanline 4096)
+	vga_allocsize += 16;															// For memory alignment	
 
 	vga.mem.linear_orgptr = new Bit8u[vga_allocsize];
 	vga.mem.linear = (Bit8u*)(((Bitu)vga.mem.linear_orgptr + 16-1) & ~(16-1));
@@ -497,6 +469,4 @@ void VGA_SetupMemory(Section* sec)
 	// In most cases these values stay the same. Assumptions: vmemwrap is power of 2,
 	// vmemwrap <= vmemsize, fastmem implicitly has mem wrap twice as big
 	vga.vmemwrap = vga.vmemsize;
-
-	sec->AddDestroyFunction(&VGA_Memory_ShutDown);
 	}

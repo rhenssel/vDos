@@ -60,7 +60,7 @@ void DOS_InfoBlock::SetLocation(Bit16u segment)
 	
 	sSave(sDIB, bootDrive, (Bit8u)0);
 	sSave(sDIB, useDwordMov, (Bit8u)1);
-	sSave(sDIB, extendedSize, (Bit16u)(MEM_TotalPages()*4-1024));
+	sSave(sDIB, extendedSize, TOT_MEM_BYTES/1024-1024);
 	sSave(sDIB, magicWord, (Bit16u)0x0001);		// dos5+
 
 	sSave(sDIB, sharingCount, (Bit16u)0);
@@ -133,7 +133,10 @@ void DOS_InfoBlock::SetDiskBufferHeadPt(Bit32u _dbheadpt)
 
 Bit16u DOS_InfoBlock::GetStartOfUMBChain(void)
 	{
-	return (Bit16u)sGet(sDIB, startOfUMBChain);
+	Bit16u umb_start = (Bit16u)sGet(sDIB, startOfUMBChain);
+	if (umb_start != 0xffff && umb_start != 0x9fff)
+		E_Exit("Corrupt UMB chain: %x", umb_start);
+	return umb_start;
 	}
 
 void DOS_InfoBlock::SetStartOfUMBChain(Bit16u _umbstartseg)
@@ -267,16 +270,14 @@ void DOS_PSP::CloseFiles(void)
 
 void DOS_PSP::SaveVectors(void)
 	{
-	// Save interrupt 22, 23, 24
-	sSave(sPSP, int_22, RealGetVec(0x22));
+	sSave(sPSP, int_22, RealGetVec(0x22));									// Save interrupt 22, 23, 24
 	sSave(sPSP, int_23, RealGetVec(0x23));
 	sSave(sPSP, int_24, RealGetVec(0x24));
 	}
 
 void DOS_PSP::RestoreVectors(void)
 	{
-	// Restore interrupt 22, 23, 24
-	RealSetVec(0x22, sGet(sPSP, int_22));
+	RealSetVec(0x22, sGet(sPSP, int_22));									// Restore interrupt 22, 23, 24
 	RealSetVec(0x23, sGet(sPSP, int_23));
 	RealSetVec(0x24, sGet(sPSP, int_24));
 	}
@@ -286,7 +287,7 @@ void DOS_PSP::SetCommandTail(RealPt src)
 	if (src)	// valid source
 		{
 //		vPC_rMovsb(pt+offsetof(sPSP, cmdtail), dWord2Ptr(src), 128);
-		vPC_rMovsb(pt+offsetof(sPSP, cmdtail), dWord2Ptr(src), vPC_rLodsb(dWord2Ptr(src))+2);		// terminating zero already in place
+		vPC_rMovsb(pt+offsetof(sPSP, cmdtail), dWord2Ptr(src), vPC_rLodsb(dWord2Ptr(src))+2);	// Terminating zero is already in place
 		}
 	else
 		{		// empty
@@ -307,12 +308,11 @@ void DOS_PSP::SetFCB2(RealPt src)
 		vPC_rMovsb(SegOff2Ptr(seg, offsetof(sPSP, fcb2)), dWord2Ptr(src), 16);
 	}
 
-bool DOS_PSP::SetNumFiles(Bit16u fileNum)
+void DOS_PSP::SetNumFiles(Bit16u fileNum)
 	{
-	if (fileNum > 20)
+	if (fileNum > 20)																// Allocate needed paragraphs
 		{
-		// Allocate needed paragraphs
-		fileNum += 2;		// Add a few more files for safety
+		fileNum += 2;																// Add a few more files for safety
 		Bit16u para = (fileNum/16)+((fileNum%16) > 0);
 		RealPt data	= SegOff2dWord(DOS_GetMemory(para), 0);
 		sSave(sPSP, file_table, data);
@@ -325,7 +325,6 @@ bool DOS_PSP::SetNumFiles(Bit16u fileNum)
 		}
 	else
 		sSave(sPSP, max_files, fileNum);
-	return true;
 	}
 
 void DOS_DTA::SetupSearch(Bit8u _sdrive, Bit8u _sattr, char * pattern)

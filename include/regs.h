@@ -23,7 +23,7 @@
 #define FLAG_ID		0x00200000
 
 #define FMASK_TEST		(FLAG_CF | FLAG_PF | FLAG_AF | FLAG_ZF | FLAG_SF | FLAG_OF)
-#define FMASK_NORMAL	(FMASK_TEST | FLAG_DF | FLAG_TF | FLAG_IF | FLAG_AC )	
+#define FMASK_NORMAL	(FMASK_TEST | FLAG_DF | FLAG_TF | FLAG_IF )	
 #define FMASK_ALL		(FMASK_NORMAL | FLAG_IOPL | FLAG_NT)
 
 #define SETFLAGBIT(TYPE,TEST) if (TEST) reg_flags|=FLAG_ ## TYPE; else reg_flags&=~FLAG_ ## TYPE
@@ -64,22 +64,22 @@ struct CPU_Regs {
 extern Segments Segs;
 extern CPU_Regs cpu_regs;
 
-static INLINE PhysPt SegPhys(SegNames index)
+static inline PhysPt SegPhys(SegNames index)
 	{
 	return Segs.phys[index];
 	}
 
-static INLINE Bit16u SegValue(SegNames index)
+static inline Bit16u SegValue(SegNames index)
 	{
 	return (Bit16u)Segs.val[index];
 	}
 	
-static INLINE RealPt RealMakeSeg(SegNames index, Bit16u off)
+static inline RealPt RealMakeSeg(SegNames index, Bit16u off)
 	{
 	return SegOff2dWord(SegValue(index), off);	
 	}
 
-static INLINE void SegSet16(Bitu index, Bit16u val)
+static inline void SegSet16(Bitu index, Bit16u val)
 	{
 	Segs.val[index] = val;
 	Segs.phys[index] = val << 4;

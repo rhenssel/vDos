@@ -1,7 +1,5 @@
-#include <string.h>
 #include "vDos.h"
 #include "inout.h"
-#include "setup.h"
 
 IO_WriteHandler * io_writehandlers[2][IO_MAX];
 IO_ReadHandler * io_readhandlers[2][IO_MAX];
@@ -161,29 +159,8 @@ Bitu IO_ReadD(Bitu port)
 	return (io_readhandlers[1][port](port, 2)) | (io_readhandlers[1][port+2](port+2, 2) << 16);
 	}
 
-class IO :public Module_base
+void IO_Init()
 	{
-public:
-	IO(Section* configuration):Module_base(configuration)
-		{
-		IO_FreeReadHandler(0, IO_MA, IO_MAX);
-		IO_FreeWriteHandler(0, IO_MA, IO_MAX);
-		}
-	~IO()
-		{
-		// Same as the constructor ?
-		}
-	};
-
-static IO* test;
-
-void IO_Destroy(Section*)
-	{
-	delete test;
-	}
-
-void IO_Init(Section * sect)
-	{
-	test = new IO(sect);
-	sect->AddDestroyFunction(&IO_Destroy);
+	IO_FreeReadHandler(0, IO_MA, IO_MAX);
+	IO_FreeWriteHandler(0, IO_MA, IO_MAX);
 	}

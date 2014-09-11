@@ -7,7 +7,6 @@
 #include "drives.h"
 #include "support.h"
 #include "callback.h"
-#include "regs.h"
 
 struct VFILE_Block {
 	const char * name;

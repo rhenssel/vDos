@@ -8,7 +8,6 @@
 class PageHandler;
 
 enum VGAModes {
-	M_CGA2, M_CGA4,
 	M_EGA, M_VGA,
 	M_TEXT,
 	M_ERROR
@@ -19,25 +18,15 @@ typedef struct {
 } VGA_Internal;
 
 typedef struct {
-	// Memory handlers
-//	Bitu mh_mask;
-
 	// Video drawing
 	Bitu display_start;
-	Bitu real_start;
-	bool retrace;					// A retrace is active
+	bool retrace;																	// A retrace is active
 	Bitu scan_len;
 	Bitu cursor_start;
 
 	// Some other screen related variables
-	Bitu line_compare;
-	bool chained;					// Enable or Disabled Chain 4 Mode
-
-	// Pixel Scrolling
-//	Bit8u pel_panning;				/* Amount of pixels to skip when starting horizontal line */
-	Bit8u hlines_skip;
-	Bit8u bytes_skip;
-//	Bit8u addr_shift;
+//	Bitu line_compare;
+	bool chained;																	// Enable or Disabled Chain 4 Mode
 
 	// Specific stuff memory write/read handling
 	Bit8u read_mode;
@@ -63,8 +52,6 @@ typedef struct {
 	Bitu height;
 	Bitu blocks;
 	Bitu address;
-	Bitu panning;
-	Bitu bytes_skip;
 	Bit8u *linear_base;
 	Bitu linear_mask;
 	Bitu address_add;
@@ -72,26 +59,14 @@ typedef struct {
 	Bitu address_line_total;
 	Bitu address_line;
 	Bitu lines_total;
-//	Bitu vblank_skip;
 	Bitu lines_done;
-	Bitu split_line;
-	Bitu parts_total;
-	Bitu parts_lines;
-	Bitu parts_left;
-	Bitu byte_panning_shift;
 	struct {
 		double framestart;
-		double vrstart, vrend;		// V-retrace
-		double hrstart, hrend;		// H-retrace
-		double hblkstart, hblkend;	// H-blanking
-		double vblkstart, vblkend;	// V-Blanking
+		double vrstart, vrend;														// V-retrace
 		double vdend, vtotal;
-		double hdend, htotal;
-		double parts;
+		double htotal;
 		float singleline_delay;
 	} delay;
-//	double screen_ratio;
-	double refresh;
 	bool doublescan_merging;
 	Bit8u font[64*1024];
 	Bit8u * font_tables[2];
@@ -104,7 +79,6 @@ typedef struct {
 		Bit8u enabled;
 	} cursor;
 	bool vret_triggered;
-//	Bitu bpp;
 } VGA_Draw;
 
 typedef struct {
@@ -120,16 +94,9 @@ typedef struct {
 	Bit8u palette[16];
 	Bit8u mode_control;
 	Bit8u horizontal_pel_panning;
-	Bit8u overscan_color;
 	Bit8u color_plane_enable;
 	Bit8u color_select;
 	Bit8u index;
-	Bit8u disabled; // Used for disabling the screen.
-					// Bit0: screen disabled by attribute controller index
-					// Bit1: screen disabled by sequencer index 1 bit 5
-					// These are put together in one variable for performance reasons:
-					// the line drawing function is called maybe 60*480=28800 times/s,
-					// and we only need to check one variable for zero this way.
 } VGA_Attr;
 
 typedef struct {
@@ -158,9 +125,7 @@ typedef struct {
 	Bit8u end_vertical_blanking;
 	Bit8u mode_control;
 	Bit8u line_compare;
-
 	Bit8u index;
-	bool read_only;
 } VGA_Crtc;
 
 typedef struct {
@@ -241,7 +206,7 @@ void VGA_ATTR_SetPalette(Bit8u index,Bit8u val);
 
 // The VGA Subfunction startups
 void VGA_SetupAttr(void);
-void VGA_SetupMemory(Section* sec);
+void VGA_SetupMemory();
 void VGA_SetupDAC(void);
 void VGA_SetupCRTC(void);
 void VGA_SetupMisc(void);
