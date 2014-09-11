@@ -32,9 +32,17 @@ DOS_Shell::DOS_Shell():Program()
 	exit = false;
 	bf = 0;
 	call = false;
-	DOS_PSP psp(dos. psp());					// clear eventually inherited file entries
-	for (Bit16u entry = 5; entry < 20; entry++)
-		psp.SetFileHandle(entry, 0xff);
+
+	DOS_PSP psp(dos. psp());							// Close eventually inherited file entries/handles
+	for (Bit16u entry = 5; entry < 20; entry++)			// Perhaps not completly fool proof, but ok
+		{
+		Bit8u handle = psp.GetFileHandle(entry);
+		if ((handle < DOS_FILES) && Files[handle])
+			{
+			Files[handle]->RemoveRef();
+			psp.SetFileHandle(entry, 0xff);
+			}
+		}
 	}
 
 Bitu DOS_Shell::GetRedirection(char *s, char **ifn, char **ofn, bool * append)
@@ -110,7 +118,7 @@ void DOS_Shell::ParseLine(char * line)
 	{
 	line = trim(line);
 
- 	if (bf && line[0] == '@')				// Check for a leading '@' in batchfile
+ 	if (bf && line[0] == '@')						// Check for a leading '@' in batchfile
 		line = ltrim(++line);
 //	if (!strnicmp(line, "rem ", 4))
 //		return;
@@ -121,10 +129,10 @@ void DOS_Shell::ParseLine(char * line)
 
 	Bit16u dummy, dummy2;
 	Bit32u bigdummy = 0;
-	Bitu num = 0;		// Number of commands in this line
+	Bitu num = 0;									// Number of commands in this line
 	bool append;
-	bool normalstdin  = false;	// wether stdin/out are open on start
-	bool normalstdout = false;	// Bug: Assumed is they are "con"
+	bool normalstdin  = false;						// wether stdin/out are open on start
+	bool normalstdout = false;						// Bug: Assumed is they are "con"
 	
 	num = GetRedirection(line, &in, &out, &append);
 	if (in || out)

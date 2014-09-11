@@ -556,7 +556,7 @@ bool DOS_OpenFile(char const* name, Bit8u flags, Bit16u* entry)
 	else if (exists = Drives[drive]->FileOpen(&Files[handle], fullname, flags))
 		Files[handle]->SetDrive(drive);
 	if (exists || device)
-		{ 
+		{
 		Files[handle]->AddRef();
 		psp.SetFileHandle(*entry, handle);
 		return true;

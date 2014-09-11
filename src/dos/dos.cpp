@@ -17,6 +17,7 @@ DOS_InfoBlock dos_infoblock;
 
 #define DOS_COPYBUFSIZE 0x10000
 Bit8u dos_copybuf[DOS_COPYBUFSIZE];
+Bit8u daysInMonth[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
 void DOS_SetError(Bit16u code)
 	{
@@ -316,10 +317,14 @@ static Bitu DOS_21Handler(void)
 		reg_dx = (systime.wMonth<<8) + systime.wDay;
 		}
 		break;
-	case 0x2b:		// Set System Date
-	case 0x2d:		// Set System Time
-		reg_al = 0xff;			// We don't set the date/time (don't know if the return code invalid date/time, system date/time unchanged is OK)	
-		break;
+	case 0x2b:									// Set System Date (we don't!)
+		reg_al = 0xff;
+		daysInMonth[2] = reg_cx&3 ? 28 : 29;	// year is from 1980 to 2099, it is this simple
+		if (reg_cx >= 1980 && reg_cx <= 2099)
+			if (reg_dh > 0 && reg_dh <= 12)
+				if (reg_dl > 0 && reg_dl <= daysInMonth[reg_dh])
+					reg_al = 0;					// Date is valid, fake set
+		break;			
 	case 0x2c:		// Get System Time
 		{
 		_SYSTEMTIME systime;				// return the Windows localtime
@@ -327,6 +332,12 @@ static Bitu DOS_21Handler(void)
 		reg_cx = (systime.wHour<<8) + systime.wMinute;
 		reg_dx = (systime.wSecond<<8) + systime.wMilliseconds/10;
 		}
+		break;
+	case 0x2d:									// Set System Time (we don't!)
+		if (reg_ch < 24 && reg_cl < 60 && reg_dh < 60 && reg_dl < 100)
+			reg_al = 0;							// Time is valid, fake set
+		else
+			reg_al = 0xff; 
 		break;
 	case 0x2e:		// Set Verify flag
 		dos.verify = (reg_al == 1);
@@ -721,13 +732,13 @@ static Bitu DOS_21Handler(void)
 		reg_al = dos.return_code;	// Officially read from SDA and clear when read
 		reg_ah = dos.return_mode;
 		break;
-	case 0x4e:		// FINDFIRST Find first matching file
+	case 0x4e:												// FINDFIRST Find first matching file
 		vPC_rStrnCpy(name1, SegPhys(ds)+reg_dx, DOSNAMEBUF);
 		DosPathStripSpaces(name1);							// NB FiAd calls this with 8.3 format
 		if (DOS_FindFirst(name1, reg_cx))
 			{
 			CALLBACK_SCF(false);	
-			reg_ax = 0;			// Undocumented
+			reg_ax = 0;										// Undocumented
 			}
 		else
 			{
@@ -735,12 +746,12 @@ static Bitu DOS_21Handler(void)
 			CALLBACK_SCF(true);
 			}
 		break;		 
-	case 0x4f:		// FINDNEXT Find next matching file
+	case 0x4f:												// FINDNEXT Find next matching file
 		if (DOS_FindNext())
 			{
 			CALLBACK_SCF(false);
-			// reg_ax=0xffff;			// Undocumented
-			reg_ax = 0;			// Undocumented:Qbix Willy beamish
+			// reg_ax=0xffff;								// Undocumented
+			reg_ax = 0;										// Undocumented:Qbix Willy beamish
 			}
 		else
 			{

@@ -181,6 +181,7 @@ void MSG_Init()
 
 	MSG_Add("COPY:FAILURE",				"Copy failure : %s\n");
 	MSG_Add("COPY:SUCCESS",				"   %d file(s) copied\n");
+	MSG_Add("COPY:SAMEFILE",			"File cannot be copied onto itself\n");
 	MSG_Add("DATE:DAYS",				"3SunMonTueWedThuFriSat");
 	MSG_Add("DATE:FORMAT",				"M-D-Y");
 	MSG_Add("DATE:NOW",					"Current date is %s\n");
@@ -202,7 +203,7 @@ void MSG_Init()
 	MSG_Add("SET:NOT_SET",				"Environment variable %s not defined\n");
 	MSG_Add("SET:OUT_OF_SPACE",			"Not enough environment space left\n");
 	MSG_Add("TIME:NOW",					"Current time is %2u:%02u:%02u.%02u\n");
-	MSG_Add("VER:MESS",					"DOS Version %d.%02d\n");
+	MSG_Add("VER:MESS",					"vDos %s, reported DOS version: %d.%02d\n");
 
 	LoadMessageFile();
 	}

@@ -342,9 +342,6 @@ bool DOS_Shell::Execute(char* name, char* args)
 
 char * DOS_Shell::Which(char* name)
 	{
-	if (DOS_FileExists(name))
-		return name;
-
 	size_t name_len = strlen(name);
 	if (name_len >= DOS_PATHLENGTH)
 		return 0;
@@ -361,6 +358,8 @@ char * DOS_Shell::Which(char* name)
 		}
 	else if (strchr(name, '.'))
 		has_extension = true;
+	if (has_extension && DOS_FileExists(name))
+		return name;
 
 	// try to find .com .exe .bat appended
 	static char which_ret[DOS_PATHLENGTH+4];
@@ -368,7 +367,7 @@ char * DOS_Shell::Which(char* name)
 		for (int i = 0; i < 3; i++)
 			if (DOS_FileExists(strcat(strcpy(which_ret, name), exec_ext[i])))
 				return which_ret;
-	if (has_path || name[1] == ':')		// if path or drive included FAIL (not found above)
+	if (has_path || name[1] == ':')					// if path or drive included FAIL (not found above)
 		return 0;
 
 	// No drive or path in filename, look through path environment string

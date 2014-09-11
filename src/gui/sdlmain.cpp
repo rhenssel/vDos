@@ -34,6 +34,7 @@
 
 #define aboutWidth 400
 #define aboutHeight 160
+
 typedef struct {
 	Bit8u blue;
 	Bit8u green;
@@ -41,19 +42,11 @@ typedef struct {
 	Bit8u alpha;		// unused
 } alt_rgb;
 
-alt_rgb altBGR0[16];
-alt_rgb altBGR1[16] =  {
-	{16,  16,  16},  {176,  64, 16},   {0, 152,   0},   {176, 144, 0}, {64,  32,  176}, {176,   0, 144}, {0,  96, 208}, {192, 192, 192},
-	{96,  96,  96},  {255, 136, 40}, {0, 184,   120}, {224, 244, 144}, {48,  72,  216}, {255, 244, 224}, {128, 224, 244}, {240, 240, 240}
-};
-alt_rgb altBGR2[16] =  {
-	{44,  44,  44},  {164,  80, 44},   {32, 146,   32},   {164, 140, 32}, {80,  56,  164}, {164,   32, 140}, {32,  104, 188}, {176, 176, 176},
-	{104,  104,  104},  {212, 134, 62}, {32, 170,   122}, {200, 215, 140}, {68,  86,  194}, {223, 215, 200}, {128, 200, 215}, {212, 212, 212}
-};
+alt_rgb altBGR0[16], altBGR1[16];
 
 
 struct SDL_Block {
-	bool	active;							// If this isn't set don't draw
+	bool	active;											// If this isn't set don't draw
 	bool	updating;
 	short	scale;
 	Bit16u	width;
@@ -61,6 +54,7 @@ struct SDL_Block {
 	SDL_Surface * surface;
 };
 SDL_Block sdl;
+
 HWND	sdlHwnd;
 
 static DWORD ttfSize= sizeof(vDosTTFbi);
@@ -70,6 +64,10 @@ static bool winFramed;
 static bool screendump = false;
 static int prevPointSize = 0;
 static RECT prevPosition;
+static int winPerc = 75;
+static int initialX = -1;
+static int initialY = -1;
+
 bool winHidden = true;
 bool aboutShown = false;
 bool selectingText = false;
@@ -96,6 +94,14 @@ static void TimedSetSize()
 		sdl.surface = SDL_SetVideoMode(sdl.width, sdl.height, 32, SDL_SWSURFACE|(winFramed ? 0 : SDL_NOFRAME));
 	if (!sdl.surface)
 		E_Exit("SDL: Failed to create surface");
+	if (initialX >= 0)																			// Position window (only once at startup)
+		{
+		RECT SDLRect;
+		GetWindowRect(sdlHwnd, &SDLRect);														// Window has to be shown completely
+		if (initialX+SDLRect.right-SDLRect.left <= GetSystemMetrics(SM_CXSCREEN) && initialY+SDLRect.bottom-SDLRect.top <= GetSystemMetrics(SM_CYSCREEN))
+			MoveWindow(sdlHwnd, initialX, initialY, SDLRect.right - SDLRect.left, SDLRect.bottom - SDLRect.top, true);
+		initialX = -1;
+		}
 	SDL_ShowCursor(!ttf.fullScrn);
 	sdl.active = true;
 	}
@@ -270,20 +276,16 @@ void GFX_EndTextLines(void)
 	for (int y = 0; y < ttf.lins; y++)
 		{
 		if (!hasFocus)
-			if (y == 0)
+			if (y == 0)																// Dim topmost line
 				{
-				if (colorsLocked)
-					rgbColors = altBGR2;											// dim top line
-				else
-					{
+				if (!colorsLocked)
 					for (int i = 0; i < 16; i++)
 						{
 						altBGR0[i].blue = (render.pal.rgb[i].blue*2 + 128)/4;
 						altBGR0[i].green = (render.pal.rgb[i].green*2 + 128)/4;
 						altBGR0[i].red = (render.pal.rgb[i].red*2+ 128)/4;
-						rgbColors = altBGR0;
 						}
-					}
+				rgbColors = altBGR0;
 				}
 			else if (y == 1)
 				rgbColors = colorsLocked? altBGR1 : (alt_rgb*)render.pal.rgb;		// undim the rest
@@ -299,14 +301,32 @@ void GFX_EndTextLines(void)
 				ymax = y;
 				ttf_textRect.x = ttf.offX+x*ttf.width;
 
-				Bit8u color = newAC[x]>>12;
-				ttf_bgColor.b = rgbColors[color].blue;
-				ttf_bgColor.g = rgbColors[color].green;
- 				ttf_bgColor.r = rgbColors[color].red;
-				color = (newAC[x]>>8)&15;
-				ttf_fgColor.b = rgbColors[color].blue;
-				ttf_fgColor.g = rgbColors[color].green;
-				ttf_fgColor.r = rgbColors[color].red;
+				Bit8u colorBG = newAC[x]>>12;
+				Bit8u colorFG = (newAC[x]>>8)&15;
+
+				if (wpVersion > 0)																// If WP and not negative (color value to text attribute excluded)
+					{
+					if (colorFG == 0xe && colorBG == 1)
+						{
+						TTF_SetFontStyle(ttf.SDL_font, TTF_STYLE_ITALIC);
+						colorFG = 7;
+						}
+					else if ((colorFG == 1 || colorFG == 0xf) && colorBG == 7)
+						{
+						TTF_SetFontStyle(ttf.SDL_font, TTF_STYLE_UNDERLINE);
+						colorBG = 1;
+						colorFG = colorFG == 1 ? 7 : 0xf;
+						}
+					else
+						TTF_SetFontStyle(ttf.SDL_font, TTF_STYLE_NORMAL);
+					}
+
+				ttf_bgColor.b = rgbColors[colorBG].blue;
+				ttf_bgColor.g = rgbColors[colorBG].green;
+ 				ttf_bgColor.r = rgbColors[colorBG].red;
+				ttf_fgColor.b = rgbColors[colorFG].blue;
+				ttf_fgColor.g = rgbColors[colorFG].green;
+				ttf_fgColor.r = rgbColors[colorFG].red;
 
 				int x1 = x;
 				Bit8u ascii = newAC[x]&255;
@@ -325,7 +345,7 @@ void GFX_EndTextLines(void)
 					}
 				else
 					{
-					color = newAC[x]>>8;
+					Bit8u color = newAC[x]>>8;
 					do												// as long foreground/background color equal
 						{
 						curAC[x] = newAC[x];
@@ -380,17 +400,33 @@ void GFX_EndTextLines(void)
 				ymax = max(y, ymax);
 				}
 			ttf.cursor = newPos;
-//			if (x >= xmin && x <= xmax && y >= ymin && y <= ymax  && (GetTickCount()&0x400))							// If overdrawn previuosly (or new shape)
+//			if (x >= xmin && x <= xmax && y >= ymin && y <= ymax  && (GetTickCount()&0x400))	// If overdrawn previuosly (or new shape)
 			if (x >= xmin && x <= xmax && y >= ymin && y <= ymax)							// If overdrawn previuosly (or new shape)
 				{
-				Bit8u color = newAttrChar[ttf.cursor]>>12;
-				ttf_bgColor.b = rgbColors[color].blue;
-				ttf_bgColor.g = rgbColors[color].green;
-				ttf_bgColor.r = rgbColors[color].red;
-				color = (newAttrChar[ttf.cursor]>>8)&15;
-				ttf_fgColor.b = rgbColors[color].blue;
-				ttf_fgColor.g = rgbColors[color].green;
-				ttf_fgColor.r = rgbColors[color].red;
+				Bit8u colorBG = newAttrChar[ttf.cursor]>>12;
+				Bit8u colorFG = (newAttrChar[ttf.cursor]>>8)&15;
+				if (wpVersion > 0)																// If WP and not negative (color value to text attribute excluded)
+					{
+					if (colorFG == 0xe && colorBG == 1)
+						{
+						TTF_SetFontStyle(ttf.SDL_font, TTF_STYLE_ITALIC);
+						colorFG = 7;
+						}
+					else if ((colorFG == 1 || colorFG == 0xf) && colorBG == 7)
+						{
+						TTF_SetFontStyle(ttf.SDL_font, TTF_STYLE_UNDERLINE);
+						colorBG = 1;
+						colorFG = colorFG == 1 ? 7 : 0xf;
+						}
+					else
+						TTF_SetFontStyle(ttf.SDL_font, TTF_STYLE_NORMAL);
+					}
+				ttf_bgColor.b = rgbColors[colorBG].blue;
+				ttf_bgColor.g = rgbColors[colorBG].green;
+				ttf_bgColor.r = rgbColors[colorBG].red;
+				ttf_fgColor.b = rgbColors[colorFG].blue;
+				ttf_fgColor.g = rgbColors[colorFG].green;
+				ttf_fgColor.r = rgbColors[colorFG].red;
 				unimap[0] = cpMap[newAttrChar[ttf.cursor]&255];
 				unimap[1] = 0;
 				// first redraw character
@@ -542,7 +578,6 @@ void readTTF(const char *fName)												// Open and read alternative font
 		{
 		if (!fseek(ttf_fh, 0, SEEK_END))
 			if ((ttfSize = ftell(ttf_fh)) != -1L)
-				{
 				if (ttfFont = malloc((size_t)ttfSize))
 					if (!fseek(ttf_fh, 0, SEEK_SET))
 						if (fread(ttfFont, 1, (size_t)ttfSize, ttf_fh) == (size_t)ttfSize)
@@ -550,7 +585,6 @@ void readTTF(const char *fName)												// Open and read alternative font
 							fclose(ttf_fh);
 							return;
 							}
-				}
 		fclose(ttf_fh);
 		}
 	E_Exit("Could not load font file: %s.ttf", fName);
@@ -618,6 +652,87 @@ static LRESULT CALLBACK SysMenuExtendWndProc(HWND hwnd, UINT uiMsg, WPARAM wpara
 	return CallWindowProc(fnSDLDefaultWndProc, hwnd, uiMsg, wparam, lparam);
 	}
 
+
+bool setColors(const char *colorArray)
+	{
+	const char * nextRGB = colorArray;
+	Bit8u * altPtr = (Bit8u *)altBGR1;
+	int rgbVal[3];
+	for (int colNo = 0; colNo < 16; colNo++)
+		{
+		if (sscanf(nextRGB, " ( %d , %d , %d )", &rgbVal[0], &rgbVal[1], &rgbVal[2]) == 3)	// Decimal: (red,green,blue)
+			{
+			for (int i = 0; i< 3; i++)
+				{
+				if (rgbVal[i] < 0 || rgbVal[i] >255)
+					return false;
+				altPtr[2-i] = rgbVal[i];
+				}
+			while (*nextRGB != ')')
+				nextRGB++;
+			nextRGB++;
+			}
+		else if (sscanf(nextRGB, " #%6x", &rgbVal[0]) == 1)							// Hexadecimal
+			{
+			if (rgbVal < 0)
+				return false;
+			for (int i = 0; i < 3; i++)
+				{
+				altPtr[i] = rgbVal[0]&255;
+				rgbVal[0] >>= 8;
+				}
+			nextRGB = strchr(nextRGB, '#') + 7;
+			}
+		else
+			return false;
+		altPtr += 4;
+		}
+	for (int i = 0; i < 16; i++)
+		{
+		altBGR0[i].blue = (altBGR1[i].blue*2 + 128)/4;
+		altBGR0[i].green = (altBGR1[i].green*2 + 128)/4;
+		altBGR0[i].red = (altBGR1[i].red*2 + 128)/4;
+		}
+	return true;
+	}
+
+
+bool setWinInitial(const char *winDef)
+	{																						// Format = <max perc>[,x-pos:y-pos]
+	if (!*winDef)																			// Nothing set
+		return true;
+	int testVal1, testVal2, testVal3;
+	char testStr[512];
+	if (sscanf(winDef, "%d%s", &testVal1, testStr) == 1)									// Only <max perc>
+		if (testVal1 > 0 && testVal1 <= 100)												// 1/100% are absolute minimum/maximum
+			{
+			winPerc = testVal1;
+			return true;
+			}
+	if (sscanf(winDef, "%d,%d:%d%s", &testVal1, &testVal2, &testVal3, testStr) == 3)		// All parameters
+		if (testVal1 > 0 && testVal1 <= 100 && testVal2 >= 0 && testVal3 >= 0)				// x-and y-pos only tested for positive values
+			{																				// values too high are checked later and eventually dropped
+			winPerc = testVal1;
+			initialX = testVal2;
+			initialY = testVal3;
+			return true;
+			}
+	return false;
+	}
+
+void configError(const char * option, const char * mess)
+	{
+	std::string errors = "CONFIG.TXT - unresolved ";
+	errors += option;
+	errors += " parameter(s):\n";
+	std::string descr = mess;
+	if (descr.length() > 40)
+		errors += "\n" + descr.substr(0, 37) + "...";
+	else
+		errors += "\n" + descr;
+	MessageBox(NULL, errors.c_str(), "vDos - Warning", MB_OK|MB_ICONWARNING);
+	}
+
 void GUI_StartUp(Section * sec)
 	{
 	sec->AddDestroyFunction(&GUI_ShutDown);
@@ -653,25 +768,25 @@ void GUI_StartUp(Section * sec)
 	if (hide10th > 0)
 		hideWinTill += hide10th*100;
 	usesMouse = static_cast<Section_prop *>(control->GetSection())->Get_bool("mouse");
-	int wpTest = static_cast<Section_prop *>(control->GetSection())->Get_int("wp");
-	if (wpTest < 0)																				// If negative, exclude some WP stuff in the future
-		{
-		wpExclude = true;
-		wpTest = 0 - wpTest;
-		}
-	if (wpTest < 100)																			// The idea is that major/minor version is given
-		wpVersion = wpTest;
+	wpVersion = static_cast<Section_prop *>(control->GetSection())->Get_int("wp");				// If negative, exclude some WP stuff in the future
 	winFramed = static_cast<Section_prop *>(control->GetSection())->Get_bool("frame");
 	sdl.scale = static_cast<Section_prop *>(control->GetSection())->Get_int("scale");
-	if (static_cast<Section_prop *>(control->GetSection())->Get_bool("color"))
+	const char * colors = static_cast<Section_prop *>(control->GetSection())->Get_string("colors");
+	if (*colors)
 		{
-		rgbColors = altBGR1;
-		colorsLocked = true;
+		if (setColors(colors))
+			{
+			rgbColors = altBGR1;
+			colorsLocked = true;
+			}
+		else
+			configError("COLORS=", colors);
 		}
-	int winPerc = static_cast<Section_prop *>(control->GetSection())->Get_int("window");		// 100% = max, less = % of screen covered
+	const char * winDef = static_cast<Section_prop *>(control->GetSection())->Get_string("window");
+	if (!setWinInitial(winDef))
+		configError("WINDOW=", winDef);
 	if (winPerc == 100)
 		ttf.fullScrn = true;
-	winPerc = max(1, min(100, winPerc));														// 1, 100% are absolute minimum/maximum
 
 	int maxWidth = GetSystemMetrics(SM_CXSCREEN);
 	int maxHeight = GetSystemMetrics(SM_CYSCREEN);
@@ -1006,7 +1121,7 @@ void GFX_Events()
 					event.key.keysym.sym = (SDLKey)94;
 
 			if (!deadKey && event.type == SDL_KEYDOWN && event.key.keysym.unicode == 0)
-				if (event.key.keysym.sym == 39 || event.key.keysym.sym == 34 || event.key.keysym.sym == 96 || event.key.keysym.sym == 126 || event.key.keysym.sym == 94)
+				if (event.key.keysym.sym == SDLK_QUOTE || event.key.keysym.sym == SDLK_QUOTEDBL || event.key.keysym.sym == SDLK_BACKQUOTE || event.key.keysym.sym == 126 || event.key.keysym.sym == SDLK_CARET)
 					{
 					deadKey = event.key.keysym.sym;
 					return;

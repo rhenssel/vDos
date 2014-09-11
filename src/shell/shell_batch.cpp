@@ -33,111 +33,35 @@ BatchFile::~BatchFile()
 
 bool BatchFile::ReadLine(char * line)
 	{
-	// Open the batchfile and seek to stored postion
-	if (!DOS_OpenFile(filename.c_str(), 128, &file_handle))
+	if (!DOS_OpenFile(filename.c_str(), 128, &file_handle))			// Open the batchfile and seek to stored postion
 		{
-		LOG(LOG_MISC,LOG_ERROR)("ReadLine Can't open BatchFile %s", filename.c_str());
 		delete this;
 		return false;
 		}
 	DOS_SeekFile(file_handle, &(this->location), DOS_SEEK_SET);
-	Bit8u c = 0;
-	Bit16u n = 1;
-	char temp[CMD_MAXLINE];
 emptyline:
-	char * cmd_write = temp;
+	Bit8u c;
+	Bit16u n;
+	char * cmd_write = line;
 	do
 		{
 		n = 1;
 		DOS_ReadFile(file_handle, &c, &n);
 		if (n > 0)
-			{
-			/* Why are we filtering this ?
-			 * Exclusion list: tab for batch files 
-			 * escape for ansi
-			 * backspace for alien odyssey */
-			if (c > 31 || c == 0x1b || c == '\t' || c == 8)
-				*cmd_write++ = c;
-			}
+			*cmd_write++ = c;
 		}
 	while (c != '\n' && n);
 	*cmd_write = 0;
-	if (!n && cmd_write == temp)
+	if (!n && cmd_write == line)
 		{
-		// Close file and delete batchfile
-		DOS_CloseFile(file_handle);
+		DOS_CloseFile(file_handle);									// Close file and delete batchfile
 		delete this;
 		return false;	
 		}
-	if (*temp == 0 || *temp == ':')
+	if (*line == 0 || *line == ':')
 		goto emptyline;
 
-	// Now parse the line read from the bat file for % stuff
-	cmd_write = line;
-	char * cmd_read = temp;
-	char env_name[256];
-	char * env_write;
-	while (*cmd_read)
-		{
-		env_write = env_name;
-		if (*cmd_read == '%')
-			{
-			cmd_read++;
-			if (cmd_read[0] == '%')
-				{
-				cmd_read++;
-				*cmd_write++ = '%';
-				continue;
-				}
-			if (cmd_read[0] == '0')
-				{		// Handle %0
-				const char *file_name = cmd->GetFileName();
-				cmd_read++;
-				strcpy(cmd_write, file_name);
-				cmd_write += strlen(file_name);
-				continue;
-				}
-			char next = cmd_read[0];
-			if (next > '0' && next <= '9')
-				{  
-				// Handle %1 %2 .. %9
-				cmd_read++;		// Progress reader
-				next -= '0';
-				if (cmd->GetCount() < (unsigned int)next)
-					continue;
-				std::string word;
-				if (!cmd->FindCommand(next, word))
-					continue;
-				strcpy(cmd_write, word.c_str());
-				cmd_write += strlen(word.c_str());
-				continue;
-				}
-			else
-				{
-				// Not a command line number has to be an environment string
-				char * first = strchr(cmd_read, '%');
-				// No env afterall. Somewhat of a hack though as %% and % aren't handled consistent in vDos. Maybe echo needs to parse % and %% as well.
-				if (!first)
-					{
-					*cmd_write++ = '%';
-					continue;
-					}
-				*first++ = 0;
-				std::string env;
-				if (const char *equals = shell->GetEnvStr(cmd_read))
-					{
-					strcpy(cmd_write, equals);
-					cmd_write += strlen(equals);
-					}
-				cmd_read = first;
-				}
-			}
-		else
-			*cmd_write++ = *cmd_read++;
-		}
-	*cmd_write = 0;
-	// Store current location and close bat file
-	this->location = 0;
+	this->location = 0;												// Store current location and close bat file
 	DOS_SeekFile(file_handle, &(this->location), DOS_SEEK_CUR);
 	DOS_CloseFile(file_handle);
 	return true;	

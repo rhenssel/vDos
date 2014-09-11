@@ -41,8 +41,7 @@ void INT10_Init(Section*);
 
 static Bit32u mSecsLast = 0;
 bool usesMouse;
-int wpVersion;							// 01 - 99 (mostly 51..62)
-bool wpExclude;							// If version was negative, to exclude some WP stuff in the future
+int wpVersion;							// 1 - 99 (mostly 51..62, negative value will exclude some WP additions)
 
 void RunPC(void)
 	{
@@ -87,10 +86,10 @@ void vDOS_Init(void)
 
 	Section_prop *secprop = control->SetSection_prop(&GUI_StartUp);
 	secprop->Add_int("scale", 0);
-	secprop->Add_int("window", 75);
+	secprop->Add_string("window", "");
 	secprop->Add_bool("low");
 	secprop->Add_bool("umb");
-	secprop->Add_bool("color");
+	secprop->Add_string("colors", "");
 	secprop->Add_bool("mouse");
 //	secprop->Add_int("files", 80);
 	secprop->Add_int("lins", 25);

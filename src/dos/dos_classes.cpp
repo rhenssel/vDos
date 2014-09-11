@@ -247,7 +247,7 @@ void DOS_PSP::CopyFileTable(DOS_PSP* srcpsp, bool createchildpsp)
 		if (createchildpsp)
 			{	// copy obeying not inherit flag.(but dont duplicate them)
 			if ((handle < DOS_FILES) && Files[handle] && !(Files[handle]->flags & DOS_NOT_INHERIT))
-				{   
+				{
 				Files[handle]->AddRef();
 				SetFileHandle(i, handle);
 				}

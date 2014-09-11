@@ -82,7 +82,7 @@ void device_PRT::Close()
 	CommitData();
 	}
 
-void tryPCL2PDF(char * filename, bool postScript)
+void tryPCL2PDF(char * filename, bool postScript, bool openIt)
 	{
 	char pcl6Path[512];														// Try to start pcl6 from where vDos was started
 	strcpy(strrchr(strcpy(pcl6Path+1, _pgmptr), '\\'), postScript ? "\\pspcl6.exe" : "\\pcl6.exe");
@@ -116,7 +116,7 @@ void tryPCL2PDF(char * filename, bool postScript)
 		CloseHandle(pi.hThread);
 		if (exitCode != 0)
 			MessageBox(sdlHwnd, "(ps)pcl6 could not convert printjob to PDF", "vDos - Error", MB_OK|MB_ICONWARNING);
-		else
+		else if (openIt)
 			{
 			strcpy(pcl6Path, filename);										
 			pcl6Path[strlen(pcl6Path)-3] = 0;								// Replace .asc by .pdf
@@ -201,19 +201,20 @@ void device_PRT::CommitData()
 		}
 
 	fclose(fh);																// No longer needed
+
 	if (useDP)
 		{
 		if (nothingSet)														// DP was assumed, nothing set
 			{
 			if (rawdata.find("\x1b%-12345X@") == 0)							// it's PCL (rawdata isn't empty at this point, so test is ok)
 				{															// Postscript can be embedded (some WP drivers)
-				tryPCL2PDF(tmpAscii, rawdata.find("\n%!PS") < min(rawdata.length(), 60));	// a line should start with the signature in the first 70s characters or so
+				tryPCL2PDF(tmpAscii, rawdata.find("\n%!PS") < min(rawdata.length(), 60), true);	// a line should start with the signature in the first 70s characters or so
 				rawdata.clear();
 				return;
 				}
 			if (rawdata.find("%!PS") == 0)									// it's Postscript
 				{
-				tryPCL2PDF(tmpAscii, true);
+				tryPCL2PDF(tmpAscii, true, true);
 				rawdata.clear();
 				return;
 				}
@@ -228,7 +229,31 @@ void device_PRT::CommitData()
 			}
 		}
 	else if (stricmp(destination.c_str(), "dummy"))							// Windows command or program assumed
-		system(destination.c_str());
+		{
+		if (rawdata.find("\x1b%-12345X@") == 0)								// it's PCL (rawdata isn't empty at this point, so test is ok)
+			tryPCL2PDF(tmpAscii, rawdata.find("\n%!PS") < min(rawdata.length(), 60), false);	// a line should start with the signature in the first 70s characters or so
+		else if (rawdata.find("%!PS") == 0)									// it's Postscript
+			tryPCL2PDF(tmpAscii, true, false);
+		if (destination[0] == '"')											// If the commandline starts with '"' assume program to be started hidden							
+			{
+			STARTUPINFO si;
+			PROCESS_INFORMATION pi;
+
+			ZeroMemory(&si, sizeof(si));
+			si.cb = sizeof(si);
+			si.dwFlags = STARTF_USESHOWWINDOW;
+			si.wShowWindow = SW_HIDE;
+			ZeroMemory(&pi, sizeof(pi));
+
+			if (CreateProcess(NULL, (char *)destination.c_str(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))	// Start program
+				{
+				CloseHandle(pi.hProcess);									// Close process and thread handles
+				CloseHandle(pi.hThread);
+				}
+			}
+		else
+			system(destination.c_str());									// Let Windows handle what is meant				
+		}
 	rawdata.clear();														// fall thru
 	}
 

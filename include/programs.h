@@ -25,7 +25,7 @@ public:
 	const char * GetFileName() {return file_name.c_str();}
 
 	bool FindString(char const * const name, std::string & value, bool remove = false);
-	bool FindCommand(unsigned int which,std::string & value);
+	const char * FindCommand(unsigned int which);
 	bool FindStringBegin(char const * const begin, std::string & value, bool remove=false);
 	bool FindStringRemain(char const * const name, std::string & value);
 	unsigned int GetCount(void);

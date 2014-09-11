@@ -68,8 +68,10 @@ rem Default = 0.5 seconds, so in most cases the initial black DOS screen won't s
 rem This value is in tenths of a seconds, to hide the vDos window for 1 second:
 rem HIDE = 10
 
-rem To use a slightly different color scheme:
-COLOR = TRUE
+rem To use a different color scheme in text mode, supply 16 color values in RGB(r,g,b) or hexadecimal as in HTML: #RRBBGG.
+rem This gives you a bit dimmed color scheme (first line is docu):
+rem				0 - Black	1 - Blue	2 - Green 	3 - Aqua 	4 - Red 	5 - Purple	6 - Yellow 	7 - White 		8 - Gray	9 - Lt Blue		10 - Lt Green	11 - Lt Aqua	12 - Lt Red		13- Lt Purple	14 - Lt Yellow	15 - Bright White
+COLORS =	(16,16,16)	#1040B1		(0,152,0)	(0,144,176)	(176,32,64)	(144,0,176)	(208,96,0)	(192,192,192)	(96,96,96)	(40,136,255)	(120,184,0)		(144,244,224)	(216,72,48)		(224,244,255)	(244,224,128)	(240,240,240)
 
 rem To scale the window in DOS graphics mode:
 rem SCALE = <1..9> (that’s 100..900%).

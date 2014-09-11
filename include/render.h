@@ -36,6 +36,8 @@ typedef struct {
 
 typedef struct {
 	bool	inUse;
+	char	fontName[32];
+	HFONT	hFontNormal;
 	TTF_Font *SDL_font;
 	bool	vDos;								// is vDos.ttf loaded, pointsizes should be even to look really nice
 	int		pointsize;

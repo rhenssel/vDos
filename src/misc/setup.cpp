@@ -329,7 +329,6 @@ void Config::ParseConfigFile()
 					errors += "\n" + gegevens.substr(0, 37) + "...";
 				else
  					errors += "\n" + gegevens;
-//				LOG_MSG("CONFIG.TXT unresolved: %s", gegevens.c_str());
 				}
 		}
 	if (!errors.empty())
@@ -359,15 +358,14 @@ bool CommandLine::FindString(char const * const name, std::string & value, bool 
 	return true;
 	}
 
-bool CommandLine::FindCommand(unsigned int which, std::string & value)
+const char * CommandLine::FindCommand(unsigned int which)
 	{
 	if (which < 1 || which > cmds.size())
-		return false;
+		return "";
 	cmd_it it = cmds.begin();
 	for (; which > 1; which--)
 		it++;
-	value = (*it);
-	return true;
+	return (*it).c_str();
 	}
 
 bool CommandLine::FindEntry(char const * const name, cmd_it & it, bool neednext)
