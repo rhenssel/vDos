@@ -1,0 +1,13 @@
+README for vDos
+
+vDos is derived from DOSBox (http://sourceforge.net/projects/dosbox/).
+
+Where DOSBox is targeted at gaming and available for several operating
+systems. vDos is for serious (text mode) DOS applications, Windows 32/64 bits
+(XP and later) only. It lacks many of the hardware emulations of DOSBox (for
+instance graphics is only basic VGA). Instead it adds a live file system, file
+and record locking, (Windows) printing, a scalable font and more. You should be
+able to run your DOS application quickly in a safe and convenient way.
+
+If you consider using DOSBox with a database application DONT! most likely you
+will end up with corrupted databases.
