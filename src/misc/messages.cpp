@@ -84,6 +84,7 @@ void MSG_Init()
 	{
 	MSG_Add("UNSAFETOCLOSE1",		"Unsafe to close vDos");
 	MSG_Add("UNSAFETOCLOSE2",		"One or more files are open.\n\nExit from your DOS application.");
+	MSG_Add("SYSMENU:SNAPSHOT",     "Print Screen\tWin+Ctrl+PrtSc");
 	MSG_Add("SYSMENU:COPY",			"Copy all text to and open file\tWin+Ctrl+C");
 	MSG_Add("SYSMENU:PASTE",		"Paste from clipboard\tWin+Ctrl+V");
 	MSG_Add("SYSMENU:DECREASE",		"Decrease font size\tWin+F11");

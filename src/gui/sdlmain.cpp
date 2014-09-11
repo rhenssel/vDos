@@ -1,6 +1,11 @@
 ﻿#include <stdlib.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <signal.h>
+
+#include <Shlobj.h>
+
 #include "SDL.h"
 #include "..\..\SDL-1.2.15\include\SDL_syswm.h"
 #include "sdl_ttf.h"
@@ -18,6 +23,7 @@
 #define WIN32_LEAN_AND_MEAN
 
 #define WM_SC_SYSMENUABOUT		0x1110						// Pretty arbitrary, just needs to be < 0xF000
+#define WM_SC_SYSMENUSNAPSHOT	(WM_SC_SYSMENUABOUT + 5)
 #define WM_SC_SYSMENUPCOPY		(WM_SC_SYSMENUABOUT + 1)
 #define WM_SC_SYSMENUPASTE		(WM_SC_SYSMENUABOUT + 2)
 #define WM_SC_SYSMENUDECREASE	(WM_SC_SYSMENUABOUT + 3)
@@ -195,6 +201,50 @@ static int prev_sline = -1;
 static bool hasFocus = true;						// only used if not framed
 static bool hasMinButton = false;					// ,,
 static bool cursor_enabled = false;
+
+bool TakeScreenShot(void) {
+
+	PWSTR pszPath = NULL;
+	HRESULT hr;
+	hr = SHGetKnownFolderPath(FOLDERID_Screenshots, NULL, 0, &pszPath);
+
+	if (SUCCEEDED(hr)) {
+
+		int found = 0;
+		int count = 0;
+		size_t pathlength = wcslen(pszPath) + 1;
+		size_t converted = 0;
+		const size_t newpathlength = pathlength * 2;
+		char *path = (char*)malloc(newpathlength);
+		char *fileName = (char*)malloc(MAX_PATH);
+
+		struct _stat buf;
+
+		wcstombs_s(&converted, path, newpathlength, pszPath, _TRUNCATE);
+
+		while (TRUE) {
+			int len = sprintf_s(fileName, MAX_PATH, "%s/vDos ScreenShot (%d).bmp", path, count++);
+			int result = _stat(fileName, &buf);
+			if (result != 0 && errno == ENOENT) {
+				int rv = SDL_SaveBMP(sdl.surface, fileName);
+				if (rv < 0) {
+					MessageBox(sdlHwnd, SDL_GetError(), "vDos Error", MB_OK | MB_ICONERROR);
+				}
+				break;
+			}
+		}
+
+		if (path) {
+			free(path);
+		}
+
+		if (fileName) {
+			free(fileName);
+		}
+	}
+	return true;
+}
+
 
 bool dumpScreen(void)
 	{
@@ -619,22 +669,33 @@ static LRESULT CALLBACK SysMenuExtendWndProc(HWND hwnd, UINT uiMsg, WPARAM wpara
 
 			ReleaseDC(sdlHwnd, hDC);
 			aboutShown = true;
-			}
-			return 0;
-		case WM_SC_SYSMENUPCOPY:
-			dumpScreen();
-			return 0;
-		case WM_SC_SYSMENUPASTE:
-			getClipboard();
-			return 0;
-		case WM_SC_SYSMENUDECREASE:
-			decreaseFontSize();
-			return 0;
-		case WM_SC_SYSMENUINCREASE:
-			increaseFontSize();
-			return 0;
-			}
+			break;
 		}
+		case WM_SC_SYSMENUSNAPSHOT: {
+			TakeScreenShot();
+			Beep(750, 100);
+			Sleep(100);
+			Beep(750, 100);
+			break;
+		}
+		case WM_SC_SYSMENUPCOPY: {
+			dumpScreen();
+			break;
+		}
+		case WM_SC_SYSMENUPASTE: {
+			getClipboard();
+			break;
+		}
+		case WM_SC_SYSMENUDECREASE: {
+			decreaseFontSize();
+			break;
+		}
+		case WM_SC_SYSMENUINCREASE: {
+			increaseFontSize();
+			break;
+		}
+		}
+	}
 	return CallWindowProc(fnSDLDefaultWndProc, hwnd, uiMsg, wparam, lparam);
 	}
 
@@ -813,6 +874,7 @@ void GUI_StartUp()
 	RemoveMenu(hSysMenu, SC_RESTORE, MF_BYCOMMAND);
 
 	AppendMenu(hSysMenu, MF_SEPARATOR, NULL, "");
+	AppendMenu(hSysMenu, MF_STRING, WM_SC_SYSMENUSNAPSHOT, MSG_Get("SYSMENU:SNAPSHOT"));
     AppendMenu(hSysMenu, MF_STRING, WM_SC_SYSMENUPCOPY,		MSG_Get("SYSMENU:COPY"));
     AppendMenu(hSysMenu, MF_STRING, WM_SC_SYSMENUPASTE,		MSG_Get("SYSMENU:PASTE"));
 	AppendMenu(hSysMenu, MF_STRING, WM_SC_SYSMENUDECREASE,	MSG_Get("SYSMENU:DECREASE"));
