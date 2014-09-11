@@ -1,0 +1,101 @@
+Rem Keyboard (docu)
+rem ===============
+rem [Alt][Enter] switches to and from full screen mode.
+rem [Win]+F11 decreases, [Win]+F12 increases the point size of the font and so the window size.
+rem The point size of the built-in font is always even to assure an optimal alignment of line drawing characters.
+rem [Win][Ctrl]+C copies the DOS screen to a file that is opened by the Windows program assigned to text files.
+rem [Win][Ctrl]+V pastes the Windows clipboard to the DOS keyboard.
+
+
+Rem Select and copy text (docu)
+rem ===========================
+rem Start selecting a rectangle block of text with [Win][Ctrl]+mouse click.
+rem Drag the mouse and release the mouse button, the selected text is in the Window clipboard.
+
+
+Rem Options
+rem =======
+Rem vDos supports some options, you set them in this file.
+rem The default settings should only be changed if needed.
+rem Don't try to include DOS config.sys settings like KEYB=, that won't work!
+
+
+Rem Memory
+rem ======
+rem The first 64 KB (low) memory block is excluded.
+rem If you need more than 575KB of conventional memory:
+rem LOW = ON
+
+rem Upper memory blocks are also not available.
+rem You can get an extra 127KB with: 
+UMB = ON
+
+rem Extended memory is always 16MB, that should be sufficient for any DOS program.
+
+
+Rem Mouse
+rem =====
+rem In text mode the mouse is disabled.
+rem Many DOS programs just manage the mouse badly.
+rem MOUSE = ON
+
+
+Rem Window/font
+rem ===========
+rem Text is displayed using a built-in TTF font.
+rem If you want to use another TTF font, copy that file to the vDos directory.
+rem FONT = CONSOLA
+
+rem The vDos window has no borders or title bar.
+rem Hover over the top line, a minimize button will appear in the upper right corner.
+rem Left click and drag the window to move it.
+rem No close button, you have to use Exit to close the window.
+rem If you’re willing to sacrifice some screen space to get borders and title bar:
+FRAME = ON
+
+rem The initial window will cover max 75% of the screen.
+rem To change this, use WINDOW = <max percentage>:
+rem This would give you a full screen window:
+WINDOW = 50
+
+rem The number of lines/columns in text mode are the familiar 25/80.
+rem You can override this by LINS = <24..60> and COLS = <80..160>. 
+rem And use any combination of these.
+rem See for yourself if this is useful or even supported by your application.
+
+rem You can postpone vDos from displaying anything.
+rem Default = 0.5 seconds, so in most cases the initial black DOS screen won't show up.
+rem This value is in tenths of a seconds, to hide the vDos window for 1 second:
+rem HIDE = 10
+
+rem To use a slightly different color scheme:
+COLOR = TRUE
+
+rem To scale the window in DOS graphics mode:
+rem SCALE = <1..9> (that’s 100..900%).
+rem It won't be that nice, 1 point is simply enlarged to 2x2 points:
+rem SCALE = 2
+
+
+rem Printing
+rem ========
+rem LPT<1..9> and COM<1..9> are available for printing, creating RTF (Word), PDF documents or mailing.
+rem The shareware program DOSPrinter handles printer output, note it only supports ESC/P (the most widely used DOS printer).
+rem If nothing is set, it will pop up a printer selection dialog when an application prints to a port.
+rem Some examples, have a look at the DOSPrinter.pdf for more options:
+rem LPT1 = /SEL2 /CPIA /LEFT0.50 /TOP0.50
+rem COM1 = /SEL /SEL2 /RTF /CPIA /LEFT0.75 /TOP0.75 /65
+rem If you have a printer that supports your DOS application output directly:
+rem LPT2 = /SEL'HPLaserJet2200' /RAW
+
+rem Just ignore the output:
+rem LPT3 = DUMMY
+
+rem Start a Windows application with the printer data:
+rem COM2 = notepad #com2.txt
+
+rem If your DOS application supports PCL or PostScript printers.
+rem You’re lucky: great printouts and nothing to set!
+rem Output to these printers is automatically detected, converted to PDF and shown in the default PDF reader.
+rem The program (ps)pcl6.exe is required in the vDos directory.
+rem You can download these at http://www.columbia.edu/~em36/ghostpcl.html (GhostPCL-W32-Binaries.zip).

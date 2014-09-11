@@ -1,0 +1,16 @@
+@ECHO OFF
+
+rem This is essentialy the autoexec.bat of DOS.
+rem Only one additional vDos specific command is available: USE.
+
+rem At startup only z: (bootdisk/command.com) is known by DOS.
+rem So first you assign one or more DOS driveletters to Windows directories.
+rem Use <driveletter:> <Windows directory>
+rem Files/directories that don't confirm to the DOS 8.3 filenaming are hidden (as it should).
+
+rem To just use the vDos working directory as c:
+USE C: .\
+
+rem switch from z: to c:
+C:
+

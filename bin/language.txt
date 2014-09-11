@@ -1,0 +1,3 @@
+:MENU:COPY
+Copieer scherm naar bestand en open het	Win+Ctrl+C
+.
