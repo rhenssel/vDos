@@ -770,12 +770,21 @@ bool setWinInitial(const char *winDef)
 void GUI_StartUp()
 	{
 	SDL_WM_SetCaption("vDos", "vDos");
+	const char * windowTitle = ConfGetString("title");
+	SDL_WM_SetCaption(windowTitle, windowTitle);
 	SDL_SysWMinfo wminfo;
 	SDL_VERSION(&wminfo.version);
 	SDL_GetWMInfo(&wminfo);
 	sdlHwnd = wminfo.window;
 
-	SetClassLong(sdlHwnd, GCL_HICON, (LONG)LoadIcon(GetModuleHandle(NULL), "vDos_ico"));	// set vDos (SDL) icon
+	HICON IcoHwnd = (HICON)LoadImage(NULL, ConfGetString("icon"), IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE | LR_SHARED | LR_LOADTRANSPARENT);
+	if (IcoHwnd) {
+		SetClassLong(sdlHwnd, GCL_HICON, (LONG)IcoHwnd);	// set icon to the external icon
+	}
+	else {
+		SetClassLong(sdlHwnd, GCL_HICON, (LONG)LoadIcon(GetModuleHandle(NULL), "vDos_ico"));	// set vDos (SDL) icon
+	}
+
 	const char * fName = ConfGetString("font");
 	if (*fName)
 		readTTF(fName);
@@ -788,11 +797,11 @@ void GUI_StartUp()
 	ttf.cols = max(80, min(txtMaxCols, ttf.cols));
 	for (Bitu i = 0; ModeList_VGA[i].mode != 0xffff; i++)										// set the cols and lins in video mode 3
 		if (ModeList_VGA[i].mode == 3 || (ModeList_VGA[i].mode == 7))
-			{
+		{
 			ModeList_VGA[i].twidth = ttf.cols;
 			ModeList_VGA[i].theight = ttf.lins;
 			break;
-			}
+		}
 
 	int hide10th = ConfGetInt("hide");															// hide window for a while (10ths of a second)
 //	hideWinTill = GetTickCount64();																// Only supported by Vista and up

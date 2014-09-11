@@ -54,6 +54,9 @@ rem No close button, you have to use Exit to close the window.
 rem If you’re willing to sacrifice some screen space to get borders and title bar:
 FRAME = ON
 
+TITLE = vDos+ by HENSSEL.DK
+ICON = shell32,131.ico
+
 rem The initial window will cover max 75% of the screen.
 rem To change this, use WINDOW = <max percentage>:
 rem This would give you a full screen window:

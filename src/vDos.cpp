@@ -272,6 +272,8 @@ void vDOS_Init(void)
 
 	ConfAddInt("scale", 0);
 	ConfAddString("window", "");
+	ConfAddString("title", "vDos");
+	ConfAddString("icon", "vDos_ico");
 	ConfAddBool("low", false);
 	ConfAddBool("ems", false);
 	ConfAddString("colors", "");
