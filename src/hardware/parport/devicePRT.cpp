@@ -1,8 +1,13 @@
+#define _CRT_RAND_S
+
 #include "devicePRT.h"
 #include "process.h"
 #include <Shellapi.h>
 #include "vDos.h"
 #include "support.h"
+
+#include "SDL.h"
+#include "..\..\SDL-1.2.15\include\SDL_syswm.h"
 
 void LPT_CheckTimeOuts(Bit32u mSecsCurr)
 	{
@@ -129,135 +134,122 @@ void tryPCL2PDF(char * filename, bool postScript, bool openIt)
 	return;
 	}
 
-void device_PRT::CommitData()
-	{
-	timeOutAt = 0;
-	DPexitcode = -1;
-	if (DPhandle != -1)																// DOSprinter previously used
-		GetExitCodeProcess((HANDLE)DPhandle, &DPexitcode);
+char* device_PRT::generateRandomString(char *s, const int len) {
+	static const char alphanum[] =
+		"0123456789"
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+		"abcdefghijklmnopqrstuvwxyz";
 
-	FILE* fh = fopen(tmpAscii, DPexitcode == STILL_ACTIVE ? "ab" : "wb");			// Append or write to ASCII file
-	if (fh)
-		{
-		fwrite(rawdata.c_str(), rawdata.size(), 1, fh);
-		fclose(fh);
-		fh = fopen(tmpUnicode, DPexitcode == STILL_ACTIVE ? "a+b" : "w+b");			// The same for Unicode file (it's eventually read)
-		if (fh)
-			{
-			if ( DPexitcode != STILL_ACTIVE)
-				fprintf(fh, "\xff\xfe");											// It's a Unicode text file
-			for (Bit32u i = 0; i < rawdata.size(); i++)
-				{
-				Bit16u textChar =  (Bit8u)rawdata[i];
-				switch (textChar)
-					{
-				case 9:																// Tab
-				case 12:															// Formfeed
-					fwrite(&textChar, 1, 2, fh);
-					break;
-				case 10:															// Linefeed (combination)
-				case 13:
-					fwrite("\x0d\x00\x0a\x00", 1, 4, fh);
-					if (i < rawdata.size() -1 && textChar == 23-rawdata[i+1])
-						i++;
-					break;
-				default:
-					if (textChar >= 32)												// Forget about further control characters?
-						fwrite(cpMap+textChar, 1, 2, fh);
-					break;
-					}
-				}
-			}
+	for (int i = 0; i < len; ++i) {
+		unsigned int n;
+		if (rand_s(&n) == 0) {
+			s[i] = alphanum[n % (sizeof(alphanum) - 1)];
 		}
-	if (!fh)
-		{
-		rawdata.clear();
-		MessageBox(NULL, "Could not save printerdata", "vDos - Warning", MB_OK|MB_ICONSTOP);
-		return;
+		else {
+			s[i] = 0;
 		}
-	if (!stricmp(destination.c_str(), "clipboard"))									// Copy to clipboard, Unicode file handle is still open
-		{
-		if (OpenClipboard(NULL))
-			{
-			if (EmptyClipboard())
-				{
-				int bytes = ftell(fh);
-				HGLOBAL hCbData = GlobalAlloc(NULL, bytes);
-				Bit8u* pChData = (Bit8u*)GlobalLock(hCbData);
-				if (pChData)
-					{
-					fseek(fh, 2, SEEK_SET);											// Skip Unicode signature
-					fread(pChData, 1, bytes-2, fh);
-					pChData[bytes-2] = 0;
-					pChData[bytes-1] = 0;
-					SetClipboardData(CF_UNICODETEXT, hCbData);
-					GlobalUnlock(hCbData);
-					}
-				}
-			CloseClipboard();
-			}
-		fclose(fh);
-		rawdata.clear();
-		return;
-		}
-
-	fclose(fh);																		// No longer needed
-	if (useDP)
-		{
-		if (nothingSet)																// DP was assumed, nothing set
-			{
-			if (!rawdata.find("\x1b%-12345X@") || !rawdata.find("\x1b\x45"))		// It's PCL (rawdata isn't empty at this point, so test is ok)
-				{																	// Postscript can be embedded (some WP drivers)
-				tryPCL2PDF(tmpAscii, rawdata.find("\n%!PS") < min(rawdata.length(), 60), true);	// A line should start with the signature in the first 70s characters or so
-				rawdata.clear();
-				return;
-				}
-			if (rawdata.find("%!PS") == 0)											// It's Postscript
-				{
-				tryPCL2PDF(tmpAscii, true, true);
-				rawdata.clear();
-				return;
-				}
-			}
-		if (DPexitcode != STILL_ACTIVE)												// If DOSprinter isn't still running
-			{
-			char dpPath[256];														// Try to start it from where vDos was started
-			strcpy(strrchr(strcpy(dpPath, _pgmptr), '\\'), "\\DOSPrinter.exe");
-			DPhandle = _spawnl(P_NOWAIT, dpPath, "DOSPrinter.exe", destination.c_str(), NULL);
-			if (DPhandle == -1)
-				MessageBox(sdlHwnd, "Could not start DOSPrinter to handle printjob", "vDos - Error", MB_OK|MB_ICONWARNING);
-			}
-		}
-	else if (stricmp(destination.c_str(), "dummy"))									// Windows command or program assumed
-		{
-		if (rawdata.find("\x1b%-12345X@") == 0)										// It's PCL (rawdata isn't empty at this point, so test is ok)
-			tryPCL2PDF(tmpAscii, rawdata.find("\n%!PS") < min(rawdata.length(), 60), false);	// a line should start with the signature in the first 70s characters or so
-		else if (rawdata.find("%!PS") == 0)											// It's Postscript
-			tryPCL2PDF(tmpAscii, true, false);
-		if (destination[0] == '@')													// If the commandline starts with '@' assume program to be started hidden							
-			{
-			STARTUPINFO si;
-			PROCESS_INFORMATION pi;
-
-			ZeroMemory(&si, sizeof(si));
-			si.cb = sizeof(si);
-			si.dwFlags = STARTF_USESHOWWINDOW;
-			si.wShowWindow = SW_HIDE;
-			ZeroMemory(&pi, sizeof(pi));
-
-			if (!ExpandEnvironmentStrings(destination.c_str()+1, (char *)tempBuff4K, 4096))	// Replace %% WIndows variables
-				strcpy((char *)tempBuff4K, destination.c_str()+1);							// SHould always work, just to be too sure
-			if (CreateProcess(NULL, (char *)tempBuff4K, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))	// Start program
-				{
-				CloseHandle(pi.hProcess);											// Close process and thread handles
-				CloseHandle(pi.hThread);
-				}
-			}
-		else
-			system(destination.c_str());											// Let Windows decide what is meant				
-		}
-	rawdata.clear();																// Fall thru
 	}
+
+	s[len] = 0;
+
+	return s;
+}
+
+char* device_PRT::getTempFileName() {
+
+	DWORD dwRetVal = 0;
+	UINT uRetVal = 0;
+
+	char* szTempFileName = (char*)malloc(MAX_PATH);
+	TCHAR lpTempPathBuffer[MAX_PATH];
+
+	//  Gets the temp path env string (no guarantee it's a valid path).
+	dwRetVal = GetTempPath(MAX_PATH,          // length of the buffer
+		lpTempPathBuffer); // buffer for path 
+	if (dwRetVal < MAX_PATH - 11 && (dwRetVal != 0))
+	{
+		char prefix[4];
+		//  Generates a temporary file name. 
+		uRetVal = GetTempFileName(lpTempPathBuffer, // directory for tmp files
+			generateRandomString(prefix, 3),     // temp file name prefix 
+			0,                // create unique name 
+			szTempFileName);  // buffer for name 
+		if (uRetVal != 0)
+		{
+			return szTempFileName;
+		}
+	}
+	return NULL;
+}
+
+void device_PRT::executeCmd(char * pathName, char* filename, BOOL wait) {
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+
+	ZeroMemory(&si, sizeof(si));
+	si.cb = sizeof(si);
+	ZeroMemory(&pi, sizeof(pi));
+
+	char *title, *icon;
+	SDL_WM_GetCaption(&title, &icon);
+
+	std::string wndTitle = title;
+	std::string wndIcon = icon;
+
+	std::string tmpTitle = title;
+	tmpTitle.append(" - Printing...");
+
+	char* cmdline = (char*)malloc(MAX_PATH);
+
+	sprintf(cmdline, "%s \"%s\"", pathName, filename);
+
+	SDL_WM_SetCaption(tmpTitle.c_str(), tmpTitle.c_str());
+	if (!CreateProcess(NULL, cmdline, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {	// Start cmdline
+		MessageBox(sdlHwnd, ((std::string)"Could not execute '" + (std::string)pathName + "'").c_str(), "vDos - Error", MB_OK | MB_ICONERROR);
+	}
+	if (wait) {
+		WaitForSingleObject(pi.hProcess, INFINITE);
+	}
+	CloseHandle(pi.hProcess);
+	CloseHandle(pi.hThread);
+	SDL_WM_SetCaption(wndTitle.c_str(), wndIcon.c_str());
+	return;
+}
+
+void device_PRT::CommitData()
+{
+	timeOutAt = 0;
+
+	BOOL wait = 1;
+
+	if (!destination.empty()) {
+		char* tmpFile = getTempFileName();
+
+		FILE* fh = fopen(tmpFile, "wb");
+
+		if (fh) {
+			if (fwrite(rawdata.c_str(), rawdata.size(), 1, fh)) {
+				fclose(fh);
+				executeCmd((char*)destination.c_str(), tmpFile, wait);
+				if (wait) {
+					remove(tmpFile);
+				}
+			}
+			else {
+				MessageBox(sdlHwnd, ((std::string)"ERROR: Unable to write to temporary file '" + tmpFile + "'.").c_str(), "vDos - Error", MB_OK | MB_ICONERROR);
+			}
+		}
+		else {
+			MessageBox(sdlHwnd, ((std::string)"ERROR: Unable to create temporary file '" + tmpFile + "'.").c_str(), "vDos - Error", MB_OK | MB_ICONERROR);
+		}
+		free(tmpFile);
+	}
+	else {
+		MessageBox(sdlHwnd, ((std::string)"ERROR: Port '" + (std::string)port + "' is not configured.").c_str(), "vDos - Error", MB_OK | MB_ICONERROR);
+
+	}
+	rawdata.clear();
+}
 
 Bit16u device_PRT::GetInformation(void)
 	{
@@ -268,74 +260,32 @@ static char* PD_select[] = {"/SEL", "/PDF", "/RTF"};
 static char DP_lCode[] = "  ";
 
 device_PRT::device_PRT(const char *pname, const char* cmd)
-	{
-// pname: LPT1-LPT9, COM1-COM9
-// cmd:
-//  1.  Not set or empty						: DOSPrinter is assumed with "/SEL /LINES /CPIA /LEFT0.50 /TOP0.50 /Lngxx" switches.
-//												  If the data is recognized being PCL or Postscript, pcl6/gswin32c is started.
-//	2.	/SEL, /PDF or /RTF...					: DOSPrinter is called with these switches (and /Lngxx if not included).
-//  3.	clipboard								: Data is put on the clipboard.
-//	4.	dummy									: Data is discarded, output in #LPT1-9/#COM1-9 is in ASCII.
-//	5.	<Windows command/program> [options]		: Fallthru, cCommand/program [options] is started.
+{
+	// pname: LPT1-LPT9, COM1-COM9
+	// cmd:
+	//  1.  Not set or empty								: DOSPrinter is assumed with "/SEL /LINES /CPIA /LEFT0.50 /TOP0.50 /Lngxx" switches.
+	//														  If the data is recognized being PCL or Postscript, (ps)pcl6 is started.
+	//	2.	/SEL, /PDF or /RTF...							: DOSPrinter is called with these switches (and /Lngxx if not included).
+	//  3.	clipboard										: Data is put on the clipboard.
+	//	4.	dummy											: Data is discarded, output in #LPT1-9/#COM1-9 is in ASCII.
+	//	5.	<Windows command/program> [options]				: Fallthru, cCommand/program [options] is started.
+
+	strcpy(port, pname);
+	upcase(port);
+
 	SetName(pname);
 
-	strcat(strcat(strcpy(tmpAscii, "#"), pname), ".asc");							// Save ASCII data to #LPTx/#COMx.asc (NB LPTx/COMx. cannot be used)
-	strcat(strcat(strcpy(tmpUnicode, "#"), pname), ".txt");							// Save Unicode data to #LPTx/#COMx.asc (NB LPTx/COMx. cannot be used)
-	DPhandle = -1;
-	if (wpVersion && pname[3] == '9')												// LPT9/COM9 in combination with WP
-		{
+	if (wpVersion && pname[3] == '9')									// LPT9/COM9 in combination with WP
+	{
 		destination = "clipboard";
 		fastCommit = true;
-		}
+	}
 	else
-		{
+	{
 		destination = cmd;
 		fastCommit = false;
-		}
-
-	nothingSet = false;
-	if (destination.empty())														// Not defined or invalid setup, use DOSPrinter with standard switches
-		{
-		destination = "/SEL /LINES /CPIA /LEFT0.50 /TOP0.50";
-		useDP = true;
-		nothingSet = true;
-		}
-	else 
-		{
-		useDP = false;																// Test if set for using DOSPrinter with switches
-		for (int i = 0; i < 3; i++)
-			if (!strnicmp(destination.c_str(), PD_select[i], 4))
-				useDP = true;
-		}
-	if (useDP)
-		{
-		char *upperDest = new char[destination.size() + 1];
-		for (unsigned int i = 0; i < destination.size(); i++)
-			upperDest[i] = toupper(destination[i]);
-		upperDest[destination.size()] = '\0';
-		if (!strstr(upperDest, "/LNG"))												// If language not set in switches
-			{
-			if (DP_lCode[0] == ' ')
-				{
-				int langID = GetSystemDefaultLangID()&0x1ff;						// Determine UI language for DOSPrinter
-				int suppID[] = {0x16, 0x0a, 0x0c, 0x1a, 0x1b, 0x24, 0x0e, 0x10, 0x03, 0x13, 0x07, 0x00};
-				char *suppLN[] = {"PT", "ES", "FR", "HR", "SI", "SI", "HU", "IT", "CA", "NL", "DE"};
-				DP_lCode[0] = 'x';
-				for (int i = 0; suppID[i] != 0; i++)								// LCIDToLocaleName not supported in Win XP
-					if (langID == suppID[i])										// So we do it "by hand"
-						strcpy(DP_lCode, suppLN[i]);
-				}
-			if (DP_lCode[0] != 'x')
-				{
-				destination += " /lng";
-				destination += DP_lCode;
-				}
-			}
-		destination += " ";
-		destination += tmpAscii;
-		delete upperDest;
-		}
 	}
+}
 
 device_PRT::~device_PRT()
 	{

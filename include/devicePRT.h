@@ -40,6 +40,10 @@ private:
 	Bit32u	DPexitcode;
 	std::string destination;			// where to send the output to
 	std::string rawdata;				// the raw data sent to LPTx...
+	char*	getTempFileName();
+	char*	generateRandomString(char *s, const int len);
+	void	executeCmd(char * pathName, char* filename, BOOL wait);
+	char	port[5];
 	};
 
 #endif
