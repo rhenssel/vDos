@@ -168,6 +168,14 @@ char* device_PRT::getTempFileName() {
 		lpTempPathBuffer); // buffer for path 
 	if (dwRetVal < MAX_PATH - 11 && (dwRetVal != 0))
 	{
+		strcat(lpTempPathBuffer, "vDos\\");
+		if (!CreateDirectory(lpTempPathBuffer, NULL)) {
+			DWORD lastError = GetLastError();
+			if (lastError != ERROR_ALREADY_EXISTS) {
+				MessageBox(sdlHwnd, ((std::string)"Could not create temp folder '" + (std::string)lpTempPathBuffer + "'").c_str(), "vDos - Error", MB_OK | MB_ICONERROR);
+				return NULL;
+			}
+		}
 		char prefix[4];
 		//  Generates a temporary file name. 
 		uRetVal = GetTempFileName(lpTempPathBuffer, // directory for tmp files
@@ -183,6 +191,7 @@ char* device_PRT::getTempFileName() {
 }
 
 void device_PRT::executeCmd(char * pathName, char* filename, BOOL wait) {
+	//Beep(500, 250);
 	STARTUPINFO si;
 	PROCESS_INFORMATION pi;
 
@@ -213,6 +222,9 @@ void device_PRT::executeCmd(char * pathName, char* filename, BOOL wait) {
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);
 	SDL_WM_SetCaption(wndTitle.c_str(), wndIcon.c_str());
+	//Beep(500, 250);
+	//Sleep(100);
+	//Beep(500, 250);
 	return;
 }
 
@@ -220,10 +232,15 @@ void device_PRT::CommitData()
 {
 	timeOutAt = 0;
 
-	BOOL wait = 1;
+	BOOL wait = 0;
 
 	if (!destination.empty()) {
 		char* tmpFile = getTempFileName();
+
+		if (tmpFile == NULL) {
+			MessageBox(sdlHwnd, ((std::string)"ERROR: Unable to get temporary filename.").c_str(), "vDos - Error", MB_OK | MB_ICONERROR);
+			return;
+		}
 
 		FILE* fh = fopen(tmpFile, "wb");
 

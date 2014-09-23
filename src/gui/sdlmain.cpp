@@ -714,7 +714,7 @@ void GUI_StartUp()
 	SDL_GetWMInfo(&wminfo);
 	sdlHwnd = wminfo.window;
 
-	SetClassLong(sdlHwnd, GCL_HICON, (LONG)LoadIcon(GetModuleHandle(NULL), "vDos_ico"));	// set vDos (SDL) icon
+	SetClassLongPtr(sdlHwnd, GCL_HICON, (LONG)LoadIcon(GetModuleHandle(NULL), "vDos_ico"));	// set vDos (SDL) icon
 	const char * fName = ConfGetString("font");
 	if (*fName)
 		readTTF(fName);

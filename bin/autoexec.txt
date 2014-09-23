@@ -10,7 +10,10 @@ rem Files/directories that don't confirm to the DOS 8.3 filenaming are hidden (a
 
 rem To just use the vDos working directory as c:
 USE C: C:\navi
+c:
+cd navi
+navi
 
 rem switch from z: to c:
 C:
-
+rem exit
