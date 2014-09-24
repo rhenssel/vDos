@@ -19,6 +19,8 @@ Rem vDos supports some options, you set them in this file.
 rem The default settings should only be changed if needed.
 rem Don't try to include DOS config.sys settings like KEYB=, that won't work!
 
+TITLE = Navigator
+ICON = shell32,131.ico
 
 Rem Memory
 rem ======
@@ -82,7 +84,7 @@ rem SCALE = 1
 
 rem Printing
 rem ========
-LPT1 = "C:\Users\henssel\Projects\VDos.new\bin\VDos.PrintHandler.exe" port=LPT1 watermark=watermark.pdf count=2 email=true emailtemplate=template.tmpl printer="Adobe PDF"
+lpt1 = direct
 LPT2 = "C:\Users\henssel\Projects\VDos.new\bin\VDos.PrintHandler.exe" port=LPT2 watermark=watermark.pdf count=2 email=true emailtemplate=template.tmpl printer="Adobe PDF"
 LPT3 = "C:\Users\henssel\Projects\VDos.new\bin\VDos.PrintHandler.exe" port=LPT3 watermark=watermark.pdf count=2 email=true emailtemplate=template.tmpl printer="Adobe PDF"
 LPT4 = "C:\Users\henssel\Projects\VDos.new\bin\VDos.PrintHandler.exe" port=LPT4 watermark=watermark.pdf count=2 email=true emailtemplate=template.tmpl printer="Adobe PDF"

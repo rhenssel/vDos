@@ -30,6 +30,7 @@ public:
 	Bit16u	GetInformation(void);
 
 private:
+	void device_PRT::ErrorDialog(const char *msg, ...);
 	void	CommitData();
 	char	tmpAscii[10];
 	char	tmpUnicode[10];
@@ -43,7 +44,6 @@ private:
 	char*	getTempFileName();
 	char*	generateRandomString(char *s, const int len);
 	void	executeCmd(char * pathName, char* filename, BOOL wait);
-	char	port[5];
 	};
 
 #endif

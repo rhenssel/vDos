@@ -16,4 +16,4 @@ navi
 
 rem switch from z: to c:
 C:
-rem exit
+exit

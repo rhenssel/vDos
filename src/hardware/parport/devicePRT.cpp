@@ -5,30 +5,31 @@
 #include <Shellapi.h>
 #include "vDos.h"
 #include "support.h"
+#include <stdarg.h>
 
 #include "SDL.h"
 #include "..\..\SDL-1.2.15\include\SDL_syswm.h"
 
 void LPT_CheckTimeOuts(Bit32u mSecsCurr)
-	{
+{
 	for (int dn = 0; dn < DOS_DEVICES; dn++)
 		if (Devices[dn] && Devices[dn]->timeOutAt != 0)
 			if (Devices[dn]->timeOutAt <= mSecsCurr)
-				{
-				Devices[dn]->timeOutAt = 0;
-				Devices[dn]->Close();
-				return;																// One device per run cycle
-				}
-	}
+			{
+		Devices[dn]->timeOutAt = 0;
+		Devices[dn]->Close();
+		return;																// One device per run cycle
+			}
+}
 
-bool device_PRT::Read(Bit8u * data,Bit16u * size)
-	{
+bool device_PRT::Read(Bit8u * data, Bit16u * size)
+{
 	*size = 0;
 	return true;
-	}
+}
 
 bool device_PRT::Write(Bit8u * data, Bit16u * size)
-	{
+{
 	// Too rude: filter out ascii 0's, at least Multivers uses them and DOSprinter doesn't filter them out
 	// At least not at determinating DPI with DPIA set
 	// May we modify the original data? Move it to rawdata?
@@ -37,7 +38,7 @@ bool device_PRT::Write(Bit8u * data, Bit16u * size)
 
 	int numSpaces = 0;
 	for (Bit16u idx = *size; idx; idx--)
-		{
+	{
 		if (*datasrc == 0x0c)
 			ffWasLast = true;
 		else if (!isspace(*datasrc))
@@ -45,58 +46,58 @@ bool device_PRT::Write(Bit8u * data, Bit16u * size)
 		if (*datasrc == ' ')														// Put spaces on hold
 			numSpaces++;
 		else
-			{
+		{
 			if (numSpaces && *datasrc != 0x0a && *datasrc != 0x0d)					// Spaces on hold and not end of line
-				{
+			{
 				while (numSpaces--)
 					*(datadst++) = ' ';
 				numSpaces = 0;
-				}
-//			if (*datasrc)
-				*(datadst++) = *datasrc;
 			}
-		datasrc++;
+			//			if (*datasrc)
+			*(datadst++) = *datasrc;
 		}
+		datasrc++;
+	}
 	while (numSpaces--)
 		*(datadst++) = ' ';
 	if (Bit16u newsize = datadst - data)											// If data
-		{
+	{
 		if (rawdata.capacity() < 100000)											// Prevent repetive size allocations
 			rawdata.reserve(100000);
 		rawdata.append((char *)data, newsize);
-		timeOutAt = GetTickCount()+LPT_LONGTIMEOUT;									// Long timeout so data is printed w/o Close()
-		}
-	return true;
+		timeOutAt = GetTickCount() + LPT_LONGTIMEOUT;									// Long timeout so data is printed w/o Close()
 	}
+	return true;
+}
 
 void device_PRT::Close()
-	{
-	rawdata.erase(rawdata.find_last_not_of(" \n\r\t")+1);							// Remove trailing white space
+{
+	rawdata.erase(rawdata.find_last_not_of(" \n\r\t") + 1);							// Remove trailing white space
 	if (!rawdata.size())															// Nothing captured/to do
 		return;
 	int len = rawdata.size();
-	if (len > 2 && rawdata[len-3] == 0x0c && rawdata[len-2] == 27 && rawdata[len-1] == 64)	// <ESC>@ after last FF?
-		{
-		rawdata.erase(len-2, 2);
+	if (len > 2 && rawdata[len - 3] == 0x0c && rawdata[len - 2] == 27 && rawdata[len - 1] == 64)	// <ESC>@ after last FF?
+	{
+		rawdata.erase(len - 2, 2);
 		ffWasLast = true;
-		}
+	}
 	if (!ffWasLast && timeOutAt && !fastCommit)										// For programs initializing the printer in a seperate module
-		{
+	{
 		timeOutAt = GetTickCount() + LPT_SHORTTIMEOUT;								// Short timeout if ff was not last
 		return;
-		}
-	CommitData();
 	}
+	CommitData();
+}
 
 void tryPCL2PDF(char * filename, bool postScript, bool openIt)
-	{
+{
 	char pcl6Path[512];																// Try to start gswin32c/pcl6 from where vDos was started
-	strcpy(strrchr(strcpy(pcl6Path+1, _pgmptr), '\\'), postScript ? "\\gswin32c.exe" : "\\pcl6.exe");
-	if (_access(pcl6Path+1, 4))														// If not found/readable
-		{
-		MessageBox(sdlHwnd, "Could not find pcl6 or gswin32c to handle printjob", "vDos - Error", MB_OK|MB_ICONWARNING);
+	strcpy(strrchr(strcpy(pcl6Path + 1, _pgmptr), '\\'), postScript ? "\\gswin32c.exe" : "\\pcl6.exe");
+	if (_access(pcl6Path + 1, 4))														// If not found/readable
+	{
+		MessageBox(sdlHwnd, "Could not find pcl6 or gswin32c to handle printjob", "vDos - Error", MB_OK | MB_ICONWARNING);
 		return;
-		}
+	}
 
 	STARTUPINFO si;
 	PROCESS_INFORMATION pi;
@@ -107,32 +108,32 @@ void tryPCL2PDF(char * filename, bool postScript, bool openIt)
 	si.wShowWindow = SW_HIDE;
 	ZeroMemory(&pi, sizeof(pi));
 
-	pcl6Path[0] ='"';																// Surround path with quotes to be sure
+	pcl6Path[0] = '"';																// Surround path with quotes to be sure
 	strcat(pcl6Path, "\" -sDEVICE=pdfwrite -o ");
 	strcat(pcl6Path, filename);
-	pcl6Path[strlen(pcl6Path)-3] = 0;												// Replace .asc by .pdf
-	strcat (pcl6Path, "pdf ");
+	pcl6Path[strlen(pcl6Path) - 3] = 0;												// Replace .asc by .pdf
+	strcat(pcl6Path, "pdf ");
 	strcat(pcl6Path, filename);
 	if (CreateProcess(NULL, pcl6Path, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))	// Start pcl6/gswin32c.exe
-		{
+	{
 		WaitForSingleObject(pi.hProcess, INFINITE);									// Wait for pcl6/gswin32c to exit
 		DWORD exitCode = -1;
 		GetExitCodeProcess(pi.hProcess, &exitCode);
 		CloseHandle(pi.hProcess);													// Close process and thread handles
 		CloseHandle(pi.hThread);
 		if (exitCode != 0)
-			MessageBox(sdlHwnd, "pcl6 or gswin32c could not convert printjob to PDF", "vDos - Error", MB_OK|MB_ICONWARNING);
+			MessageBox(sdlHwnd, "pcl6 or gswin32c could not convert printjob to PDF", "vDos - Error", MB_OK | MB_ICONWARNING);
 		else if (openIt)
-			{
-			strcpy(pcl6Path, filename);										
-			pcl6Path[strlen(pcl6Path)-3] = 0;										// Replace .asc by .pdf
+		{
+			strcpy(pcl6Path, filename);
+			pcl6Path[strlen(pcl6Path) - 3] = 0;										// Replace .asc by .pdf
 			strcat(pcl6Path, "pdf");
 			if (!_access(pcl6Path, 4))												// If generated PDF file found/readable
 				ShellExecute(NULL, "open", pcl6Path, NULL, NULL, SW_SHOWNORMAL);	// Open/show it
-			}
 		}
-	return;
 	}
+	return;
+}
 
 char* device_PRT::generateRandomString(char *s, const int len) {
 	static const char alphanum[] =
@@ -172,7 +173,7 @@ char* device_PRT::getTempFileName() {
 		if (!CreateDirectory(lpTempPathBuffer, NULL)) {
 			DWORD lastError = GetLastError();
 			if (lastError != ERROR_ALREADY_EXISTS) {
-				MessageBox(sdlHwnd, ((std::string)"Could not create temp folder '" + (std::string)lpTempPathBuffer + "'").c_str(), "vDos - Error", MB_OK | MB_ICONERROR);
+				ErrorDialog("Could not create temp folder '%s'", lpTempPathBuffer);
 				return NULL;
 			}
 		}
@@ -191,7 +192,7 @@ char* device_PRT::getTempFileName() {
 }
 
 void device_PRT::executeCmd(char * pathName, char* filename, BOOL wait) {
-	//Beep(500, 250);
+
 	STARTUPINFO si;
 	PROCESS_INFORMATION pi;
 
@@ -199,33 +200,38 @@ void device_PRT::executeCmd(char * pathName, char* filename, BOOL wait) {
 	si.cb = sizeof(si);
 	ZeroMemory(&pi, sizeof(pi));
 
-	char *title, *icon;
-	SDL_WM_GetCaption(&title, &icon);
-
-	std::string wndTitle = title;
-	std::string wndIcon = icon;
-
-	std::string tmpTitle = title;
-	tmpTitle.append(" - Printing...");
-
 	char* cmdline = (char*)malloc(MAX_PATH);
 
-	sprintf(cmdline, "%s \"%s\"", pathName, filename);
+	sprintf_s(cmdline, MAX_PATH, "%s \"%s\"", pathName, filename);
 
-	SDL_WM_SetCaption(tmpTitle.c_str(), tmpTitle.c_str());
 	if (!CreateProcess(NULL, cmdline, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {	// Start cmdline
-		MessageBox(sdlHwnd, ((std::string)"Could not execute '" + (std::string)pathName + "'").c_str(), "vDos - Error", MB_OK | MB_ICONERROR);
+		ErrorDialog("Could not execute '%s'", pathName);
 	}
 	if (wait) {
 		WaitForSingleObject(pi.hProcess, INFINITE);
 	}
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);
-	SDL_WM_SetCaption(wndTitle.c_str(), wndIcon.c_str());
-	//Beep(500, 250);
-	//Sleep(100);
-	//Beep(500, 250);
 	return;
+}
+
+void device_PRT::ErrorDialog(const char *msg, ...) {
+
+	char* buffer;
+	int len, rv;
+
+	va_list args;
+	va_start(args, msg);
+	len = _vscprintf(msg, args) + 1; // _vscprintf doesn't count terminating '\0'
+	buffer = (char*)malloc(len * sizeof(char));
+	rv = vsprintf_s(buffer, len, msg, args);
+	va_end(args);
+
+	if (rv > 0) {
+		MessageBeep(MB_ICONERROR);
+		MessageBox(sdlHwnd, buffer, "vDos - Error", MB_OK | MB_ICONERROR);
+	}
+	free(buffer);
 }
 
 void device_PRT::CommitData()
@@ -234,11 +240,33 @@ void device_PRT::CommitData()
 
 	BOOL wait = 0;
 
+	if (destination == "direct") {
+
+		DWORD dwBytesWritten = 0;
+
+		HANDLE lptPort = CreateFile(name, (GENERIC_READ | GENERIC_WRITE), 0, 0, OPEN_EXISTING, 0, 0);
+
+		BOOL bErrorFlag = WriteFile(
+			lptPort,           // open file handle
+			rawdata.c_str(),      // start of data to write
+			(DWORD)rawdata.size(),  // number of bytes to write
+			&dwBytesWritten, // number of bytes that were written
+			NULL);            // no overlapped structure
+
+		if (FALSE == bErrorFlag)
+		{
+			ErrorDialog("ERROR: Unable open '%s'", name);
+		}
+		rawdata.clear();
+		CloseHandle(lptPort);
+		return;
+	}
+
 	if (!destination.empty()) {
 		char* tmpFile = getTempFileName();
 
 		if (tmpFile == NULL) {
-			MessageBox(sdlHwnd, ((std::string)"ERROR: Unable to get temporary filename.").c_str(), "vDos - Error", MB_OK | MB_ICONERROR);
+			ErrorDialog("ERROR: Unable to get temporary filename.");
 			return;
 		}
 
@@ -251,29 +279,25 @@ void device_PRT::CommitData()
 				if (wait) {
 					remove(tmpFile);
 				}
+			} else {
+				ErrorDialog("ERROR: Unable to write to temporary file '%s'.", tmpFile);
 			}
-			else {
-				MessageBox(sdlHwnd, ((std::string)"ERROR: Unable to write to temporary file '" + tmpFile + "'.").c_str(), "vDos - Error", MB_OK | MB_ICONERROR);
-			}
-		}
-		else {
-			MessageBox(sdlHwnd, ((std::string)"ERROR: Unable to create temporary file '" + tmpFile + "'.").c_str(), "vDos - Error", MB_OK | MB_ICONERROR);
+		} else {
+			ErrorDialog("ERROR: Unable to create temporary file '%s'.", tmpFile);
 		}
 		free(tmpFile);
-	}
-	else {
-		MessageBox(sdlHwnd, ((std::string)"ERROR: Port '" + (std::string)port + "' is not configured.").c_str(), "vDos - Error", MB_OK | MB_ICONERROR);
-
+	} else {
+		ErrorDialog("ERROR: Port '%s' is not configured.", name);
 	}
 	rawdata.clear();
 }
 
 Bit16u device_PRT::GetInformation(void)
-	{
+{
 	return 0x80A0;
-	}
+}
 
-static char* PD_select[] = {"/SEL", "/PDF", "/RTF"};
+static char* PD_select[] = { "/SEL", "/PDF", "/RTF" };
 static char DP_lCode[] = "  ";
 
 device_PRT::device_PRT(const char *pname, const char* cmd)
@@ -287,23 +311,28 @@ device_PRT::device_PRT(const char *pname, const char* cmd)
 	//	4.	dummy											: Data is discarded, output in #LPT1-9/#COM1-9 is in ASCII.
 	//	5.	<Windows command/program> [options]				: Fallthru, cCommand/program [options] is started.
 
-	strcpy(port, pname);
-	upcase(port);
+	//char	ptmp[5];
 
+	//strcpy(ptmp, pname);
+	//upcase(ptmp);
+	
 	SetName(pname);
+
+	if (_strcmpi(cmd, "direct") == 0) {
+		destination = "direct";
+		return;
+	}
 
 	if (wpVersion && pname[3] == '9')									// LPT9/COM9 in combination with WP
 	{
 		destination = "clipboard";
 		fastCommit = true;
-	}
-	else
-	{
+	} else {
 		destination = cmd;
 		fastCommit = false;
 	}
 }
 
 device_PRT::~device_PRT()
-	{
-	}
+{
+}
