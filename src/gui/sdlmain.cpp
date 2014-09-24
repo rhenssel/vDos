@@ -769,15 +769,20 @@ bool setWinInitial(const char *winDef)
 
 void GUI_StartUp()
 	{
-	SDL_WM_SetCaption("vDos", "vDos");
-	const char * windowTitle = ConfGetString("title");
-	SDL_WM_SetCaption(windowTitle, windowTitle);
+
+	const char *windowTitle = ConfGetString("TITLE");
+	if (*windowTitle) {
+		SDL_WM_SetCaption(windowTitle, windowTitle);
+	} else {
+		SDL_WM_SetCaption("vDos", "vDos");
+	}
+
 	SDL_SysWMinfo wminfo;
 	SDL_VERSION(&wminfo.version);
 	SDL_GetWMInfo(&wminfo);
 	sdlHwnd = wminfo.window;
 
-	HICON IcoHwnd = (HICON)LoadImage(NULL, ConfGetString("icon"), IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE | LR_SHARED | LR_LOADTRANSPARENT);
+	HICON IcoHwnd = (HICON)LoadImage(NULL, ConfGetString("ICON"), IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE | LR_SHARED | LR_LOADTRANSPARENT);
 	if (IcoHwnd) {
 		SetClassLongPtr(sdlHwnd, GCL_HICON, (LONG)IcoHwnd);	// set icon to the external icon
 	}
@@ -786,10 +791,11 @@ void GUI_StartUp()
 	}
 
 	const char * fName = ConfGetString("font");
-	if (*fName)
+	if (*fName) {
 		readTTF(fName);
-	else
-		ttf.vDos = true;;
+	} else {
+		ttf.vDos = true;
+	}
 
 	ttf.lins =ConfGetInt("lins");
 	ttf.lins = max(24, min(txtMaxLins, ttf.lins));

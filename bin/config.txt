@@ -19,8 +19,6 @@ Rem vDos supports some options, you set them in this file.
 rem The default settings should only be changed if needed.
 rem Don't try to include DOS config.sys settings like KEYB=, that won't work!
 
-TITLE = Navigator
-ICON = shell32,131.ico
 
 Rem Memory
 rem ======
@@ -49,6 +47,7 @@ rem Text is displayed using a built-in TTF font.
 rem If you want to use another TTF font, copy that file to the vDos directory.
 rem FONT = CONSOLA
 
+
 rem The vDos window has no borders or title bar.
 rem Hover over the top line, a minimize button will appear in the upper right corner.
 rem Left click and drag the window to move it.
@@ -56,8 +55,15 @@ rem No close button, you have to use Exit to close the window.
 rem If you’re willing to sacrifice some screen space to get borders and title bar:
 FRAME = ON
 
-TITLE = vDos+ by HENSSEL.DK
+rem Sets the title of the vDos window. This way the vDos window can reflect the name
+rem of the main application running under vDos
+TITLE = Navigator
+
+
+rem Sets the icon of the vDos window. This way the vDos window can reflect the icon
+rem of the main application running under vDos
 ICON = shell32,131.ico
+
 
 rem The initial window will cover max 75% of the screen.
 rem To change this, use WINDOW = <max percentage>:
