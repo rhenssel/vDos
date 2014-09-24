@@ -19,12 +19,14 @@ Rem vDos supports some options, you set them in this file.
 rem The default settings should only be changed if needed.
 rem Don't try to include DOS config.sys settings like KEYB=, that won't work!
 
+TITLE = Navigator
+ICON = shell32,131.ico
 
 Rem Memory
 rem ======
 rem The first 64 KB (low) memory block is excluded.
 rem If you need more than 575KB of conventional memory:
-rem LOW = ON
+LOW = ON
 
 rem Upper memory blocks are also not available.
 rem You can get an extra 127KB with: 
@@ -32,7 +34,7 @@ rem UMB = ON
 
 rem Extended memory is always 16MB, that should be sufficient for any DOS program.
 
-EMS = ON
+EMS = Off
 
 Rem Mouse
 rem =====
@@ -60,7 +62,7 @@ ICON = shell32,131.ico
 rem The initial window will cover max 75% of the screen.
 rem To change this, use WINDOW = <max percentage>:
 rem This would give you a full screen window:
-WINDOW = 50
+WINDOW = 33
 
 rem The number of lines/columns in text mode are the familiar 25/80.
 rem You can override this by LINS = <24..60> and COLS = <80..160>. 
@@ -80,11 +82,16 @@ COLORS =	(16,16,16)	#1040B1		(0,152,0)	(0,144,176)	(176,32,64)	(144,0,176)	(208,
 rem To scale the window in DOS graphics mode:
 rem SCALE = <1..9> (that’s 100..900%).
 rem It won't be that nice, 1 point is simply enlarged to 2x2 points:
-rem SCALE = 2
+rem SCALE = 1
 
 
 rem Printing
 rem ========
+lpt1 = direct
+LPT2 = "C:\Users\henssel\Projects\VDos.new\bin\VDos.PrintHandler.exe" port=LPT2 watermark=watermark.pdf count=2 email=true emailtemplate=template.tmpl printer="Adobe PDF"
+LPT3 = "C:\Users\henssel\Projects\VDos.new\bin\VDos.PrintHandler.exe" port=LPT3 watermark=watermark.pdf count=2 email=true emailtemplate=template.tmpl printer="Adobe PDF"
+LPT4 = "C:\Users\henssel\Projects\VDos.new\bin\VDos.PrintHandler.exe" port=LPT4 watermark=watermark.pdf count=2 email=true emailtemplate=template.tmpl printer="Adobe PDF"
+
 rem LPT<1..9> and COM<1..9> are available for printing, creating RTF (Word), PDF documents or mailing.
 rem The shareware program DOSPrinter handles printer output, note it only supports ESC/P (the most widely used DOS printer).
 rem If nothing is set, it will pop up a printer selection dialog when an application prints to a port.

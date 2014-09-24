@@ -779,10 +779,10 @@ void GUI_StartUp()
 
 	HICON IcoHwnd = (HICON)LoadImage(NULL, ConfGetString("icon"), IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE | LR_SHARED | LR_LOADTRANSPARENT);
 	if (IcoHwnd) {
-		SetClassLong(sdlHwnd, GCL_HICON, (LONG)IcoHwnd);	// set icon to the external icon
+		SetClassLongPtr(sdlHwnd, GCL_HICON, (LONG)IcoHwnd);	// set icon to the external icon
 	}
 	else {
-		SetClassLong(sdlHwnd, GCL_HICON, (LONG)LoadIcon(GetModuleHandle(NULL), "vDos_ico"));	// set vDos (SDL) icon
+		SetClassLongPtr(sdlHwnd, GCL_HICON, (LONG)LoadIcon(GetModuleHandle(NULL), "vDos_ico"));	// set vDos (SDL) icon
 	}
 
 	const char * fName = ConfGetString("font");

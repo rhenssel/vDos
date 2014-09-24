@@ -30,6 +30,7 @@ public:
 	Bit16u	GetInformation(void);
 
 private:
+	void device_PRT::ErrorDialog(const char *msg, ...);
 	void	CommitData();
 	char	tmpAscii[10];
 	char	tmpUnicode[10];
@@ -40,6 +41,9 @@ private:
 	Bit32u	DPexitcode;
 	std::string destination;			// where to send the output to
 	std::string rawdata;				// the raw data sent to LPTx...
+	char*	getTempFileName();
+	char*	generateRandomString(char *s, const int len);
+	void	executeCmd(char * pathName, char* filename, BOOL wait);
 	};
 
 #endif
