@@ -88,11 +88,14 @@ void DOS_SetDefaultDrive(Bit8u drive)
 		}
 	}
 
-char makename_out[DOS_PATHLENGTH * 2];
-char makename_in[DOS_PATHLENGTH * 2];
+
 
 bool DOS_MakeName(char const* const name, char* fullname, Bit8u* drive)				// Nb, returns path w/o leading '\\'!
 	{
+
+	char makename_out[MAX_PATH]; // This will make sure that the PathCanonicalize function doesn't fail.
+	char makename_in[DOS_PATHLENGTH * 2];
+
 	if (!name || *name == 0 || *name == ' ')										// Both \0 and space are seperators and empty filenames report file not found
 		{
 		DOS_SetError(DOSERR_FILE_NOT_FOUND);
@@ -130,14 +133,18 @@ bool DOS_MakeName(char const* const name, char* fullname, Bit8u* drive)				// Nb
 			}
 		}
 	*oPtr = 0;
-	if (!(PathCanonicalize(makename_out, makename_in) && NormalizePath(makename_out)))
-		{ 
+	if (!(PathCanonicalize(makename_out, makename_in) && NormalizePath(makename_out))) { 
 		DOS_SetError(DOSERR_PATH_NOT_FOUND);
 		return false; 
-		}
+	}
+	
+	if ( strlen(makename_out) >= DOS_PATHLENGTH ) { // Make sure that we dont try to create a path that is longer than DOS_PATHLENGTH (80 chars)
+		DOS_SetError(DOSERR_PATH_NOT_FOUND);
+		return false;
+	}
 	strcpy(fullname, makename_out + (*makename_out =='\\' ? 1 : 0));				// Leading '\\' dropped again
 	return true;	
-	}
+}
 
 bool DOS_GetCurrentDir(Bit8u drive, char * const buffer)
 	{
