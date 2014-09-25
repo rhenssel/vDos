@@ -504,9 +504,11 @@ bool DOS_OpenFile(char const* name, Bit8u flags, Bit16u* entry)
 
 	if (device && wpVersion)															// WP - clipboard
 		{
+#pragma warning(suppress: 28159)
 		if (GetTickCount() > wpOpenDevTime + 1000)										// Recalibrate after some (1/2 sec) time
 			{
 			wpOpenDevCount = 0;
+#pragma warning(suppress: 28159)
 			wpOpenDevTime = GetTickCount();
 			}
 		if ((devnum == 8 || devnum == 17) && !(++wpOpenDevCount&2))					// LPT9/COM9 (1-4 rejected by WP, 9 reserved for Edward Mendelson's macros)

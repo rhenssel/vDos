@@ -65,6 +65,7 @@ bool device_PRT::Write(Bit8u * data, Bit16u * size)
 		if (rawdata.capacity() < 100000)											// Prevent repetive size allocations
 			rawdata.reserve(100000);
 		rawdata.append((char *)data, newsize);
+#pragma warning(suppress: 28159)
 		timeOutAt = GetTickCount() + LPT_LONGTIMEOUT;									// Long timeout so data is printed w/o Close()
 	}
 	return true;
@@ -83,6 +84,7 @@ void device_PRT::Close()
 	}
 	if (!ffWasLast && timeOutAt && !fastCommit)										// For programs initializing the printer in a seperate module
 	{
+#pragma warning(suppress: 28159)
 		timeOutAt = GetTickCount() + LPT_SHORTTIMEOUT;								// Short timeout if ff was not last
 		return;
 	}

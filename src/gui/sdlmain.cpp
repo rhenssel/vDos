@@ -129,6 +129,7 @@ void GFX_SetSize(Bitu width, Bitu height)
 bool GFX_StartUpdate()
 	{
 	if (winHidden)
+#pragma warning(suppress: 28159)
 		if (GetTickCount() >= hideWinTill)
 			{
 			winHidden = false;
@@ -811,6 +812,7 @@ void GUI_StartUp()
 
 	int hide10th = ConfGetInt("hide");															// hide window for a while (10ths of a second)
 //	hideWinTill = GetTickCount64();																// Only supported by Vista and up
+#pragma warning(suppress: 28159)
 	hideWinTill = GetTickCount();
 	if (hide10th > 0)
 		hideWinTill += hide10th*100;

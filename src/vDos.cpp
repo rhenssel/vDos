@@ -63,6 +63,7 @@ void RunPC(void)
 			{
 			GFX_Events();
 			TIMER_AddTick();
+#pragma warning(suppress: 28159)
 			Bit32u mSecsNew = GetTickCount();
 			if (mSecsNew <= mSecsLast+18)											// To be real save???
 				{
